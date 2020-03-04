@@ -1,0 +1,4 @@
+mvn compile exec:java -D exec.mainClass=com.cognite.sa.beam.replicate.ReplicateEvents -D exec.args="--cdfSourceConfigFile=gs://beam-component/config/config-project-config-prod.toml --cdfTargetConfigFile=gs:/beam-component/config/config-project-config-test.toml --jobConfigFile=gs://beam-component/config/replicate/job-config-events-replication.toml --project=cognite-sa-sandbox --runner=DataFlowRunner --gcpTempLocation=gs://beam-component/temp --stagingLocation=gs://beam-component/stage/replicate/replicate-events --region=europe-west1 --experiments=shuffle_mode=service --numWorkers=10 --maxNumWorkers=20 --experiments=enable_stackdriver_agent_metrics"
+
+# In order to add profiling:
+# --profilingAgentConfiguration='{\""APICurated\"" : true}'

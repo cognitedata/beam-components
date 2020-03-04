@@ -1,0 +1,1 @@
+mvn compile exec:java -D exec.mainClass=com.cognite.sa.beam.replicate.ReplicateRaw -D exec.args="--cdfInputConfigFile=gs://beam-component/config/config-project-config-prod.toml --cdfOutputConfigFile=gs://beam-component/config/config-project-config-test.toml --jobConfigFile=./src/config/job-config-raw-replication.toml"

@@ -1,0 +1,28 @@
+{
+  "name": "CDF TS header to BQ",
+  "description": "Extracts TS header from CDF and publishes them to BQ.",
+  "parameters": [{
+    "name": "cdfConfigFile",
+    "label": "CDF project configuration file",
+    "help_text": "CDF project configuration file. ex: gs://MyBucket/config.toml",
+    "is_optional": false
+  },
+  {
+        "name": "fullRead",
+        "label": "Full read override.",
+        "help_text": "Set to true for full read. Set to false for delta read. Default is false.",
+        "is_optional": false
+      },
+  {
+    "name": "outputMainTable",
+    "label": "Output table in BQ",
+    "help_text": "Project, dataset and tablename for the BQ output ex: <project>:<dataset>.<table>",
+    "is_optional": false
+  },
+  {
+    "name": "bqTempStorage",
+    "label": "Temporary storage for writing to BQ",
+    "help_text": "Path and filename prefix for writing temp files. ex: gs://MyBucket/temp",
+    "is_optional": false
+  }]
+}

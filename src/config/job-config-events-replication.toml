@@ -1,0 +1,3 @@
+# General config options
+[config]
+enableContextualization = "yes" # yes/no, try linking the events to assets

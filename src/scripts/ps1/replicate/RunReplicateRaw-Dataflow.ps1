@@ -1,0 +1,4 @@
+mvn compile exec:java -D exec.mainClass=com.cognite.sa.beam.replicate.ReplicateRaw -D exec.args="--cdfInputConfigFile=gs://beam-component/config/config-project-config-prod.toml --cdfOutputConfigFile=gs://beam-component/config/config-project-config-test.toml --jobConfigFile=gs://beam-component/config/job-config-raw-replication.toml --project=cognite-sa-sandbox --runner=DataFlowRunner --gcpTempLocation=gs://beam-component/temp --stagingLocation=gs://beam-component/stage/replicate-raw --region=europe-west1 --experiments=shuffle_mode=service --numWorkers=2 --maxNumWorkers=6 --experiments=enable_stackdriver_agent_metrics --workerMachineType=n1-standard-2"
+
+# In order to add profiling:
+# --profilingAgentConfiguration='{\""APICurated\"" : true}'

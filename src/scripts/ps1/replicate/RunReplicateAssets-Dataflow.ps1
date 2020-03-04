@@ -1,0 +1,4 @@
+mvn compile exec:java -D exec.mainClass=com.cognite.sa.beam.replicate.ReplicateAssets -D exec.args="--cdfSourceConfigFile=gs://beam-component/config/config_project-config-prod.toml --cdfTargetConfigFile=gs://beam-component/config/config_project-config-test.toml --jobConfigFile=gs://akerbp-dataflow-test/config/replicate/job-config-assets-replication.toml --project=cognite-sa-sandbox --runner=DataFlowRunner --gcpTempLocation=gs://beam-component/temp --stagingLocation=gs://beam-component/stage/replicate/replicate-assets --region=europe-west1 --experiments=shuffle_mode=service --numWorkers=1 --maxNumWorkers=4 --experiments=enable_stackdriver_agent_metrics --workerMachineType=n1-standard-2"
+
+# In order to add profiling:
+# --profilingAgentConfiguration='{\""APICurated\"" : true}'

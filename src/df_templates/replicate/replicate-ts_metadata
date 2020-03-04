@@ -1,0 +1,22 @@
+{
+  "name": "Timeseries replicator",
+  "description": "Replicates timeseries headers and datapoints from one CDF instance to another.",
+  "parameters": [{
+    "name": "cdfSourceConfigFile",
+    "label": "CDF source project configuration file",
+    "help_text": "CDF project configuration file for the source. ex: gs://MyBucket/project-config.toml",
+    "is_optional": false
+  },
+   {
+     "name": "cdfTargetConfigFile",
+     "label": "CDF target project configuration file",
+     "help_text": "CDF configuration file for the target. ex: gs://MyBucket/project-config.toml",
+     "is_optional": false
+   },
+  {
+    "name": "jobConfigFile",
+    "label": "The configuration file for the job",
+    "help_text": "The job configuration file, ex: gs://MyBucket/job-config.toml",
+    "is_optional": false
+  }]
+}

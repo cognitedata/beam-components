@@ -1,0 +1,12 @@
+# General config options
+[config]
+tsHeaders = "yes"               # synch ts headers
+tsPoints = "yes"                # synch ts points
+tsPointsWindowDays = "1"        # the time window (in days) for ts points synch
+enableContextualization = "no" # yes/no, try linking the TS headers to assets
+
+# Filters specifying which time series to include in the replication
+[blacklist]
+tsExternalId = []           # leave empty for no blacklist
+[whitelist]
+tsExternalId = ["*"]        # "*" includes all TS

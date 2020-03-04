@@ -1,0 +1,5 @@
+# Filters specifying which asset hierarchies to include in the replication
+[blacklist]
+rootAssetExternalId = []           # leave empty for no blacklist
+[whitelist]
+rootAssetExternalId = ["*"]        # "*" includes all asset hierarchies
