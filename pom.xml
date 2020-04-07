@@ -6,7 +6,7 @@
 
     <groupId>com.cognite.data</groupId>
     <artifactId>beam-components</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>0.1.4-SNAPSHOT</version>
 
     <repositories>
         <repository>
@@ -30,7 +30,7 @@
         <maven.compiler.target>1.8</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <beam.version>2.17.0</beam.version>
-        <beam.connector.version>0.8.5</beam.connector.version>
+        <beam.connector.version>0.8.3</beam.connector.version>
         <maven-jar-plugin.version>3.0.0</maven-jar-plugin.version>
     </properties>
 
