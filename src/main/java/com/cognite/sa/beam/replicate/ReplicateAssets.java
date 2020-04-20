@@ -62,8 +62,9 @@ public class ReplicateAssets {
             builder.clearId();
             builder.clearParentId();
 
-            builder.setParentExternalId(StringValue.of(sourceAssetsIdMap.getOrDefault(input.getParentId().getValue(),
-                    "")));
+            if (sourceAssetsIdMap.containsKey(input.getParentId().getValue())) {
+                builder.setParentExternalId(StringValue.of(sourceAssetsIdMap.get(input.getParentId().getValue())));
+            }
 
             out.output(KV.of(sourceAssetsIdMap.getOrDefault(input.getRootId().getValue(),
                     ""), builder.build()));

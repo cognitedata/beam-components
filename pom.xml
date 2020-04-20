@@ -8,29 +8,12 @@
     <artifactId>beam-components</artifactId>
     <version>0.1.4-SNAPSHOT</version>
 
-    <repositories>
-        <repository>
-            <snapshots>
-                <enabled>false</enabled>
-            </snapshots>
-            <id>cognite.jfrog.io</id>
-            <name>libs-release</name>
-            <url>https://cognite.jfrog.io/cognite/libs-release</url>
-        </repository>
-        <repository>
-            <snapshots />
-            <id>snapshots.cognite.jfrog.io</id>
-            <name>libs-snapshot</name>
-            <url>https://cognite.jfrog.io/cognite/libs-snapshot</url>
-        </repository>
-    </repositories>
-
     <properties>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <beam.version>2.17.0</beam.version>
-        <beam.connector.version>0.8.3</beam.connector.version>
+        <beam.version>2.20.0</beam.version>
+        <beam.connector.version>0.9.0</beam.connector.version>
         <maven-jar-plugin.version>3.0.0</maven-jar-plugin.version>
     </properties>
 
@@ -79,28 +62,5 @@
             <version>5.5.2</version>
             <scope>test</scope>
         </dependency>
-
-        <dependency>
-            <groupId>ch.qos.logback</groupId>
-            <artifactId>logback-classic</artifactId>
-            <version>1.2.3</version>
-            <scope>test</scope>
-        </dependency>
-
     </dependencies>
-
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.0.0-M3</version>
-                <configuration>
-                    <argLine>-XX:+UnlockCommercialFeatures -XX:+FlightRecorder</argLine>
-                    <skipTests>true</skipTests>
-                    <excludedGroups>RemoteCDP, RemoteCDF</excludedGroups>
-                </configuration>
-            </plugin>
-        </plugins>
-    </build>
 </project>
