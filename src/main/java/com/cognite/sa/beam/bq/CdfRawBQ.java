@@ -2,15 +2,15 @@ package com.cognite.sa.beam.bq;
 
 import avro.shaded.com.google.common.collect.ImmutableList;
 import com.cognite.beam.io.CogniteIO;
+import com.cognite.beam.io.config.GcpSecretConfig;
 import com.cognite.beam.io.config.Hints;
+import com.cognite.beam.io.config.ProjectConfig;
 import com.cognite.beam.io.config.ReaderConfig;
 import com.cognite.beam.io.dto.RawRow;
 import com.cognite.beam.io.dto.RawTable;
 import com.cognite.beam.io.servicesV1.RequestParameters;
 import com.cognite.beam.io.transform.BreakFusion;
-import com.google.api.services.bigquery.model.TableFieldSchema;
-import com.google.api.services.bigquery.model.TableRow;
-import com.google.api.services.bigquery.model.TableSchema;
+import com.google.api.services.bigquery.model.*;
 import com.google.protobuf.Value;
 import com.google.protobuf.util.JsonFormat;
 import org.apache.beam.sdk.Pipeline;
@@ -60,13 +60,27 @@ public class CdfRawBQ {
      * Custom options for this pipeline.
      */
     public interface CdfRawBqOptions extends PipelineOptions {
+        // The options below can be used for file-based secrets handling.
         /**
          * Specify the Cdf config file.
          */
+        /*
         @Description("The cdf config file. The name should be in the format of gs://<bucket>/folder.")
         @Validation.Required
         ValueProvider<String> getCdfConfigFile();
         void setCdfConfigFile(ValueProvider<String> value);
+
+         */
+
+        @Description("The GCP secret holding the source api key. The reference should be <projectId>.<secretId>.")
+        @Validation.Required
+        ValueProvider<String> getCdfSecret();
+        void setCdfSecret(ValueProvider<String> value);
+
+        @Description("The CDF host name. The default value is https://api.cognitedata.com.")
+        @Default.String("https://api.cognitedata.com")
+        ValueProvider<String> getCdfHost();
+        void setCdfHost(ValueProvider<String> value);
 
         /**
          * Specify delta read override.
@@ -102,18 +116,25 @@ public class CdfRawBQ {
      * @param options
      */
     private static PipelineResult runCdfRawBQ(CdfRawBqOptions options) throws Exception {
+        GcpSecretConfig secretConfig = GcpSecretConfig.of(
+                ValueProvider.NestedValueProvider.of(options.getCdfSecret(), secret -> secret.split("\\.")[0]),
+                ValueProvider.NestedValueProvider.of(options.getCdfSecret(), secret -> secret.split("\\.")[1]));
+        ProjectConfig projectConfig = ProjectConfig.create()
+                .withApiKeyFromGcpSecret(secretConfig)
+                .withHost(options.getCdfHost());
+
         Pipeline p = Pipeline.create(options);
 
         // Read all raw db and table names.
         PCollection<RawTable> rawTables = p
                 .apply("Read cdf raw db names", CogniteIO.readRawDatabase()
-                        .withProjectConfigFile(options.getCdfConfigFile())
+                        .withProjectConfig(projectConfig)
                         .withReaderConfig(ReaderConfig.create()
-                        .withAppIdentifier(appIdentifier)))
+                                .withAppIdentifier(appIdentifier)))
                 .apply("Read raw table names", CogniteIO.readAllRawTable()
-                        .withProjectConfigFile(options.getCdfConfigFile())
+                        .withProjectConfig(projectConfig)
                         .withReaderConfig(ReaderConfig.create()
-                        .withAppIdentifier(appIdentifier)))
+                                .withAppIdentifier(appIdentifier)))
                 .apply("Break fusion", BreakFusion.<RawTable>create());
 
         // Read all rows
@@ -135,7 +156,7 @@ public class CdfRawBQ {
                         }
                         ))
                 .apply("Read cdf raw rows", CogniteIO.readAllRawRow()
-                        .withProjectConfigFile(options.getCdfConfigFile())
+                        .withProjectConfig(projectConfig)
                         .withHints(Hints.create()
                                 .withReadShards(20))
                         .withReaderConfig(ReaderConfig.create()
@@ -185,6 +206,8 @@ public class CdfRawBQ {
                 })
                 .withCreateDisposition(BigQueryIO.Write.CreateDisposition.CREATE_IF_NEEDED)
                 .withWriteDisposition(BigQueryIO.Write.WriteDisposition.WRITE_TRUNCATE)
+                .withTimePartitioning(new TimePartitioning().setField("last_updated_time"))
+                .withClustering(new Clustering().setFields(ImmutableList.of("db_name", "table_name")))
                 .optimizedWrites()
                 .withCustomGcsTempLocation(options.getBqTempStorage()));
 
