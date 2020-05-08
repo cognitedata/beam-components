@@ -71,6 +71,11 @@ public class CdfTsPointsBQ {
         ValueProvider<String> getCdfSecret();
         void setCdfSecret(ValueProvider<String> value);
 
+        @Description("The CDF host name. The default value is https://api.cognitedata.com.")
+        @Default.String("https://api.cognitedata.com")
+        ValueProvider<String> getCdfHost();
+        void setCdfHost(ValueProvider<String> value);
+
         /**
          * Specify delta read override.
          *
@@ -103,17 +108,25 @@ public class CdfTsPointsBQ {
      * Setup the main pipeline structure and run it.
      * @param options
      */
-    private static PipelineResult runCdfTsPointsBQ(CdfTsPointsBqOptions options) throws IOException {
+    private static PipelineResult runCdfTsPointsBQ(CdfTsPointsBqOptions options) {
+        /*
+        Build the project configuration (CDF tenant and api key) based on:
+        - api key from Secret Manager
+        - CDF api host
+         */
         GcpSecretConfig secretConfig = GcpSecretConfig.of(
                 ValueProvider.NestedValueProvider.of(options.getCdfSecret(), secret -> secret.split("\\.")[0]),
                 ValueProvider.NestedValueProvider.of(options.getCdfSecret(), secret -> secret.split("\\.")[1]));
+        ProjectConfig projectConfig = ProjectConfig.create()
+                .withApiKeyFromGcpSecret(secretConfig)
+                .withHost(options.getCdfHost());
+
         Pipeline p = Pipeline.create(options);
 
         // Read ts headers.
         PCollection<TimeseriesMetadata> tsHeaders = p
                 .apply("Read cdf TS headers", CogniteIO.readTimeseriesMetadata()
-                        .withProjectConfig(ProjectConfig.create()
-                                .withApiKeyFromGcpSecret(secretConfig))
+                        .withProjectConfig(projectConfig)
                         .withReaderConfig(ReaderConfig.create()
                                 .withAppIdentifier("CdfTsPointsBQ"))
                 ).apply("Filter out TS w/ security categories", Filter.by(
@@ -135,8 +148,7 @@ public class CdfTsPointsBQ {
                             .withRootParameter("limit", 100000);
                 }))
                 .apply("Read ts points", CogniteIO.readAllTimeseriesPoints()
-                        .withProjectConfig(ProjectConfig.create()
-                                .withApiKeyFromGcpSecret(secretConfig))
+                        .withProjectConfig(projectConfig)
                         .withReaderConfig(ReaderConfig.create()
                                 .withAppIdentifier("CdfTsPointsBQ")));
 

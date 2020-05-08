@@ -2,6 +2,8 @@ package com.cognite.sa.beam.bq;
 
 import avro.shaded.com.google.common.collect.ImmutableList;
 import com.cognite.beam.io.CogniteIO;
+import com.cognite.beam.io.config.GcpSecretConfig;
+import com.cognite.beam.io.config.ProjectConfig;
 import com.cognite.beam.io.config.ReaderConfig;
 import com.cognite.beam.io.dto.TimeseriesMetadata;
 import com.cognite.beam.io.dto.TimeseriesPoint;
@@ -60,13 +62,27 @@ public class CdfTsPointsHourBQ {
      * Custom options for this pipeline.
      */
     public interface CdfTsPointsAggBqOptions extends PipelineOptions {
+        // The options below can be used for file-based secrets handling.
         /**
          * Specify the Cdf config file.
          */
+        /*
         @Description("The cdf config file. The name should be in the format of gs://<bucket>/folder.")
         @Validation.Required
         ValueProvider<String> getCdfConfigFile();
         void setCdfConfigFile(ValueProvider<String> value);
+
+         */
+
+        @Description("The GCP secret holding the source api key. The reference should be <projectId>.<secretId>.")
+        @Validation.Required
+        ValueProvider<String> getCdfSecret();
+        void setCdfSecret(ValueProvider<String> value);
+
+        @Description("The CDF host name. The default value is https://api.cognitedata.com.")
+        @Default.String("https://api.cognitedata.com")
+        ValueProvider<String> getCdfHost();
+        void setCdfHost(ValueProvider<String> value);
 
         /**
          * Specify delta read override.
@@ -100,13 +116,25 @@ public class CdfTsPointsHourBQ {
      * Setup the main pipeline structure and run it.
      * @param options
      */
-    private static PipelineResult runCdfTsPointsAggBQ(CdfTsPointsAggBqOptions options) throws IOException {
+    private static PipelineResult runCdfTsPointsAggBQ(CdfTsPointsAggBqOptions options) {
+        /*
+        Build the project configuration (CDF tenant and api key) based on:
+        - api key from Secret Manager
+        - CDF api host
+         */
+        GcpSecretConfig secretConfig = GcpSecretConfig.of(
+                ValueProvider.NestedValueProvider.of(options.getCdfSecret(), secret -> secret.split("\\.")[0]),
+                ValueProvider.NestedValueProvider.of(options.getCdfSecret(), secret -> secret.split("\\.")[1]));
+        ProjectConfig projectConfig = ProjectConfig.create()
+                .withApiKeyFromGcpSecret(secretConfig)
+                .withHost(options.getCdfHost());
+
         Pipeline p = Pipeline.create(options);
 
         // Read ts headers.
         PCollection<TimeseriesMetadata> tsHeaders = p
                 .apply("Read cdf TS headers", CogniteIO.readTimeseriesMetadata()
-                        .withProjectConfigFile(options.getCdfConfigFile())
+                        .withProjectConfig(projectConfig)
                         .withReaderConfig(ReaderConfig.create()
                                 .withAppIdentifier("CdfTsPointsHourBQ"))
                 ).apply("Filter out TS w/ security categories", Filter.by(
@@ -133,7 +161,7 @@ public class CdfTsPointsHourBQ {
                             .withRootParameter("granularity", "1h");
                 }))
                 .apply("Read ts points", CogniteIO.readAllTimeseriesPoints()
-                        .withProjectConfigFile(options.getCdfConfigFile())
+                        .withProjectConfig(projectConfig)
                         .withReaderConfig(ReaderConfig.create()
                                 .withAppIdentifier("CdfTsPointsBQ")));
 

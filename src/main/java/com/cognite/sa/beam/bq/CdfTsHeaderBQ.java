@@ -2,6 +2,8 @@ package com.cognite.sa.beam.bq;
 
 import avro.shaded.com.google.common.collect.ImmutableList;
 import com.cognite.beam.io.CogniteIO;
+import com.cognite.beam.io.config.GcpSecretConfig;
+import com.cognite.beam.io.config.ProjectConfig;
 import com.cognite.beam.io.config.ReaderConfig;
 import com.cognite.beam.io.dto.TimeseriesMetadata;
 import com.google.api.services.bigquery.model.TableFieldSchema;
@@ -64,13 +66,22 @@ public class CdfTsHeaderBQ {
      * Custom options for this pipeline.
      */
     public interface CdfTsHeaderBqOptions extends PipelineOptions {
+        // The options below can be used for file-based secrets handling.
         /**
          * Specify the Cdf config file.
          */
+        /*
         @Description("The cdf config file. The name should be in the format of gs://<bucket>/folder.")
         @Validation.Required
         ValueProvider<String> getCdfConfigFile();
         void setCdfConfigFile(ValueProvider<String> value);
+
+         */
+
+        @Description("The GCP secret holding the source api key. The reference should be <projectId>.<secretId>.")
+        @Validation.Required
+        ValueProvider<String> getCdfSecret();
+        void setCdfSecret(ValueProvider<String> value);
 
         /**
          * Specify delta read override.
@@ -105,11 +116,15 @@ public class CdfTsHeaderBQ {
      * @param options
      */
     private static PipelineResult runCdfTsHeaderBQ(CdfTsHeaderBqOptions options) throws IOException {
+        GcpSecretConfig secretConfig = GcpSecretConfig.of(
+                ValueProvider.NestedValueProvider.of(options.getCdfSecret(), secret -> secret.split("\\.")[0]),
+                ValueProvider.NestedValueProvider.of(options.getCdfSecret(), secret -> secret.split("\\.")[1]));
         Pipeline p = Pipeline.create(options);
 
         // Read and parse the main input.
         PCollection<TimeseriesMetadata> mainInput = p.apply("Read cdp Ts headers", CogniteIO.readTimeseriesMetadata()
-                .withProjectConfigFile(options.getCdfConfigFile())
+                .withProjectConfig(ProjectConfig.create()
+                        .withApiKeyFromGcpSecret(secretConfig))
                 .withReaderConfig(ReaderConfig.create()
                         .withAppIdentifier(appIdentifier)
                         .enableDeltaRead("system.bq-delta")

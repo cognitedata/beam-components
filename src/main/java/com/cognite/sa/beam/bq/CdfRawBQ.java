@@ -115,7 +115,7 @@ public class CdfRawBQ {
      * Setup the main pipeline structure and run it.
      * @param options
      */
-    private static PipelineResult runCdfRawBQ(CdfRawBqOptions options) throws Exception {
+    private static PipelineResult runCdfRawBQ(CdfRawBqOptions options) {
         GcpSecretConfig secretConfig = GcpSecretConfig.of(
                 ValueProvider.NestedValueProvider.of(options.getCdfSecret(), secret -> secret.split("\\.")[0]),
                 ValueProvider.NestedValueProvider.of(options.getCdfSecret(), secret -> secret.split("\\.")[1]));

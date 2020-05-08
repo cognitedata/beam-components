@@ -2,7 +2,9 @@ package com.cognite.sa.beam.bq;
 
 import avro.shaded.com.google.common.collect.ImmutableList;
 import com.cognite.beam.io.CogniteIO;
+import com.cognite.beam.io.config.GcpSecretConfig;
 import com.cognite.beam.io.config.Hints;
+import com.cognite.beam.io.config.ProjectConfig;
 import com.cognite.beam.io.config.ReaderConfig;
 import com.cognite.beam.io.dto.Asset;
 import com.google.api.services.bigquery.model.TableFieldSchema;
@@ -64,13 +66,27 @@ public class CdfAssetsBQ {
      * Custom options for this pipeline.
      */
     public interface CdfAssetsBqOptions extends PipelineOptions {
+        // The options below can be used for file-based secrets handling.
         /**
          * Specify the Cdf config file.
          */
+        /*
         @Description("The cdf config file. The name should be in the format of gs://<bucket>/folder.")
         @Validation.Required
         ValueProvider<String> getCdfConfigFile();
         void setCdfConfigFile(ValueProvider<String> value);
+
+         */
+
+        @Description("The GCP secret holding the source api key. The reference should be <projectId>.<secretId>.")
+        @Validation.Required
+        ValueProvider<String> getCdfSecret();
+        void setCdfSecret(ValueProvider<String> value);
+
+        @Description("The CDF host name. The default value is https://api.cognitedata.com.")
+        @Default.String("https://api.cognitedata.com")
+        ValueProvider<String> getCdfHost();
+        void setCdfHost(ValueProvider<String> value);
 
         /**
          * Specify delta read override.
@@ -104,12 +120,24 @@ public class CdfAssetsBQ {
      * Setup the main pipeline structure and run it.
      * @param options
      */
-    private static PipelineResult runCdfAssetsBQ(CdfAssetsBqOptions options) throws IOException {
+    private static PipelineResult runCdfAssetsBQ(CdfAssetsBqOptions options) {
+        /*
+        Build the project configuration (CDF tenant and api key) based on:
+        - api key from Secret Manager
+        - CDF api host
+         */
+        GcpSecretConfig secretConfig = GcpSecretConfig.of(
+                ValueProvider.NestedValueProvider.of(options.getCdfSecret(), secret -> secret.split("\\.")[0]),
+                ValueProvider.NestedValueProvider.of(options.getCdfSecret(), secret -> secret.split("\\.")[1]));
+        ProjectConfig projectConfig = ProjectConfig.create()
+                .withApiKeyFromGcpSecret(secretConfig)
+                .withHost(options.getCdfHost());
+
         Pipeline p = Pipeline.create(options);
 
         // Read and parse the main input.
         PCollection<Asset> mainInput = p.apply("Read cdf assets", CogniteIO.readAssets()
-                .withProjectConfigFile(options.getCdfConfigFile())
+                .withProjectConfig(projectConfig)
                 .withHints(Hints.create()
                         .withReadShards(100))
                 .withReaderConfig(ReaderConfig.create()
