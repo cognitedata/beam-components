@@ -2,13 +2,13 @@ package com.cognite.sa.beam.bq;
 
 import avro.shaded.com.google.common.collect.ImmutableList;
 import com.cognite.beam.io.CogniteIO;
+import com.cognite.beam.io.config.GcpSecretConfig;
+import com.cognite.beam.io.config.ProjectConfig;
 import com.cognite.beam.io.config.ReaderConfig;
 import com.cognite.beam.io.dto.TimeseriesMetadata;
 import com.cognite.beam.io.dto.TimeseriesPoint;
 import com.cognite.beam.io.servicesV1.RequestParameters;
-import com.google.api.services.bigquery.model.TableFieldSchema;
-import com.google.api.services.bigquery.model.TableRow;
-import com.google.api.services.bigquery.model.TableSchema;
+import com.google.api.services.bigquery.model.*;
 import com.google.common.collect.ImmutableMap;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.PipelineResult;
@@ -54,13 +54,22 @@ public class CdfTsPointsBQ {
      * Custom options for this pipeline.
      */
     public interface CdfTsPointsBqOptions extends PipelineOptions {
+        // The options below can be used for file-based secrets handling.
         /**
          * Specify the Cdf config file.
          */
+        /*
         @Description("The cdf config file. The name should be in the format of gs://<bucket>/folder.")
         @Validation.Required
         ValueProvider<String> getCdfConfigFile();
         void setCdfConfigFile(ValueProvider<String> value);
+
+         */
+
+        @Description("The GCP secret holding the source api key. The reference should be <projectId>.<secretId>.")
+        @Validation.Required
+        ValueProvider<String> getCdfSecret();
+        void setCdfSecret(ValueProvider<String> value);
 
         /**
          * Specify delta read override.
@@ -95,12 +104,16 @@ public class CdfTsPointsBQ {
      * @param options
      */
     private static PipelineResult runCdfTsPointsBQ(CdfTsPointsBqOptions options) throws IOException {
+        GcpSecretConfig secretConfig = GcpSecretConfig.of(
+                ValueProvider.NestedValueProvider.of(options.getCdfSecret(), secret -> secret.split("\\.")[0]),
+                ValueProvider.NestedValueProvider.of(options.getCdfSecret(), secret -> secret.split("\\.")[1]));
         Pipeline p = Pipeline.create(options);
 
         // Read ts headers.
         PCollection<TimeseriesMetadata> tsHeaders = p
                 .apply("Read cdf TS headers", CogniteIO.readTimeseriesMetadata()
-                        .withProjectConfigFile(options.getCdfConfigFile())
+                        .withProjectConfig(ProjectConfig.create()
+                                .withApiKeyFromGcpSecret(secretConfig))
                         .withReaderConfig(ReaderConfig.create()
                                 .withAppIdentifier("CdfTsPointsBQ"))
                 ).apply("Filter out TS w/ security categories", Filter.by(
@@ -122,7 +135,8 @@ public class CdfTsPointsBQ {
                             .withRootParameter("limit", 100000);
                 }))
                 .apply("Read ts points", CogniteIO.readAllTimeseriesPoints()
-                        .withProjectConfigFile(options.getCdfConfigFile())
+                        .withProjectConfig(ProjectConfig.create()
+                                .withApiKeyFromGcpSecret(secretConfig))
                         .withReaderConfig(ReaderConfig.create()
                                 .withAppIdentifier("CdfTsPointsBQ")));
 
@@ -144,6 +158,8 @@ public class CdfTsPointsBQ {
                 })
                 .withCreateDisposition(BigQueryIO.Write.CreateDisposition.CREATE_IF_NEEDED)
                 .withWriteDisposition(BigQueryIO.Write.WriteDisposition.WRITE_TRUNCATE)
+                .withTimePartitioning(new TimePartitioning().setField("timestamp"))
+                .withClustering(new Clustering().setFields(ImmutableList.of("external_id", "id")))
                 .optimizedWrites()
                 .withCustomGcsTempLocation(options.getBqTempStorage()));
 

@@ -6,9 +6,7 @@ import com.cognite.beam.io.config.ReaderConfig;
 import com.cognite.beam.io.dto.TimeseriesMetadata;
 import com.cognite.beam.io.dto.TimeseriesPoint;
 import com.cognite.beam.io.servicesV1.RequestParameters;
-import com.google.api.services.bigquery.model.TableFieldSchema;
-import com.google.api.services.bigquery.model.TableRow;
-import com.google.api.services.bigquery.model.TableSchema;
+import com.google.api.services.bigquery.model.*;
 import com.google.common.collect.ImmutableMap;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.PipelineResult;
@@ -175,6 +173,8 @@ public class CdfTsPointsHourBQ {
                 })
                 .withCreateDisposition(BigQueryIO.Write.CreateDisposition.CREATE_IF_NEEDED)
                 .withWriteDisposition(BigQueryIO.Write.WriteDisposition.WRITE_TRUNCATE)
+                .withTimePartitioning(new TimePartitioning().setField("timestamp"))
+                .withClustering(new Clustering().setFields(ImmutableList.of("external_id", "id")))
                 .optimizedWrites()
                 .withCustomGcsTempLocation(options.getBqTempStorage()));
 
