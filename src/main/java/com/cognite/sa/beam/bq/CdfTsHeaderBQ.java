@@ -83,6 +83,11 @@ public class CdfTsHeaderBQ {
         ValueProvider<String> getCdfSecret();
         void setCdfSecret(ValueProvider<String> value);
 
+        @Description("The CDF host name. The default value is https://api.cognitedata.com.")
+        @Default.String("https://api.cognitedata.com")
+        ValueProvider<String> getCdfHost();
+        void setCdfHost(ValueProvider<String> value);
+
         /**
          * Specify delta read override.
          *
@@ -115,16 +120,24 @@ public class CdfTsHeaderBQ {
      * Setup the main pipeline structure and run it.
      * @param options
      */
-    private static PipelineResult runCdfTsHeaderBQ(CdfTsHeaderBqOptions options) throws IOException {
+    private static PipelineResult runCdfTsHeaderBQ(CdfTsHeaderBqOptions options) {
+        /*
+        Build the project configuration (CDF tenant and api key) based on:
+        - api key from Secret Manager
+        - CDF api host
+         */
         GcpSecretConfig secretConfig = GcpSecretConfig.of(
                 ValueProvider.NestedValueProvider.of(options.getCdfSecret(), secret -> secret.split("\\.")[0]),
                 ValueProvider.NestedValueProvider.of(options.getCdfSecret(), secret -> secret.split("\\.")[1]));
+        ProjectConfig projectConfig = ProjectConfig.create()
+                .withApiKeyFromGcpSecret(secretConfig)
+                .withHost(options.getCdfHost());
+
         Pipeline p = Pipeline.create(options);
 
         // Read and parse the main input.
         PCollection<TimeseriesMetadata> mainInput = p.apply("Read cdp Ts headers", CogniteIO.readTimeseriesMetadata()
-                .withProjectConfig(ProjectConfig.create()
-                        .withApiKeyFromGcpSecret(secretConfig))
+                .withProjectConfig(projectConfig)
                 .withReaderConfig(ReaderConfig.create()
                         .withAppIdentifier(appIdentifier)
                         .enableDeltaRead("system.bq-delta")
