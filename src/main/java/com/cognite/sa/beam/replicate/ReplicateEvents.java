@@ -1,11 +1,29 @@
+/*
+ * Copyright 2020 Cognite AS
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.cognite.sa.beam.replicate;
 
 import com.cognite.beam.io.CogniteIO;
-import com.cognite.beam.io.config.Hints;
-import com.cognite.beam.io.config.ReaderConfig;
-import com.cognite.beam.io.config.WriterConfig;
+import com.cognite.beam.io.config.*;
 import com.cognite.beam.io.dto.*;
+import com.cognite.beam.io.servicesV1.RequestParameters;
+import com.cognite.beam.io.transform.toml.ReadTomlStringArray;
 import com.cognite.beam.io.transform.toml.ReadTomlStringMap;
+import com.google.common.collect.ImmutableMap;
+import com.google.protobuf.ExperimentalApi;
 import com.google.protobuf.Int64Value;
 import com.google.protobuf.StringValue;
 import org.apache.beam.sdk.Pipeline;
@@ -20,6 +38,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -136,21 +156,37 @@ public class ReplicateEvents {
      * Custom options for this pipeline.
      */
     public interface ReplicateEventsOptions extends PipelineOptions {
-        /**
-         * Specify the source Cdf config file.
-         */
-        @Description("The cdf config file. The name should be in the format of gs://<bucket>/folder.")
+        // The options below can be used for file-based secrets handling.
+        /*
+        @Description("The cdf source config file.The name should be in the format of gs://<bucket>/folder.")
         @Validation.Required
-        ValueProvider<String> getCdfSourceConfigFile();
-        void setCdfSourceConfigFile(ValueProvider<String> value);
+        ValueProvider<String> getCdfInputConfigFile();
+        void setCdfInputConfigFile(ValueProvider<String> value);
 
-        /**
-         * Specify the target Cdf config file.
-         */
-        @Description("The cdf config file. The name should be in the format of gs://<bucket>/folder.")
+        @Description("The cdf target config file. The name should be in the format of gs://<bucket>/folder.")
         @Validation.Required
-        ValueProvider<String> getCdfTargetConfigFile();
-        void setCdfTargetConfigFile(ValueProvider<String> value);
+        ValueProvider<String> getCdfOutputConfigFile();
+        void setCdfOutputConfigFile(ValueProvider<String> value);
+*/
+        @Description("The GCP secret holding the source api key. The reference should be <projectId>.<secretId>.")
+        @Validation.Required
+        ValueProvider<String> getCdfInputSecret();
+        void setCdfInputSecret(ValueProvider<String> value);
+
+        @Description("The CDF source host name. The default value is https://api.cognitedata.com.")
+        @Default.String("https://api.cognitedata.com")
+        ValueProvider<String> getCdfInputHost();
+        void setCdfInputHost(ValueProvider<String> value);
+
+        @Description("The GCP secret holding the target api key. The reference should be <projectId>.<secretId>.")
+        @Validation.Required
+        ValueProvider<String> getCdfOutputSecret();
+        void setCdfOutputSecret(ValueProvider<String> value);
+
+        @Description("The CDF target host name. The default value is https://api.cognitedata.com.")
+        @Default.String("https://api.cognitedata.com")
+        ValueProvider<String> getCdfOutputHost();
+        void setCdfOutputHost(ValueProvider<String> value);
 
         /**
          * Specify the job configuration file.
@@ -170,6 +206,24 @@ public class ReplicateEvents {
      * @param options
      */
     private static PipelineResult runReplicateEvents(ReplicateEventsOptions options) throws IOException {
+        /*
+        Build the project configuration (CDF tenant and api key) based on:
+        - api key from Secret Manager
+        - CDF api host
+         */
+        GcpSecretConfig sourceSecret = GcpSecretConfig.of(
+                ValueProvider.NestedValueProvider.of(options.getCdfInputSecret(), secret -> secret.split("\\.")[0]),
+                ValueProvider.NestedValueProvider.of(options.getCdfInputSecret(), secret -> secret.split("\\.")[1]));
+        ProjectConfig sourceConfig = ProjectConfig.create()
+                .withApiKeyFromGcpSecret(sourceSecret)
+                .withHost(options.getCdfInputHost());
+        GcpSecretConfig targetSecret = GcpSecretConfig.of(
+                ValueProvider.NestedValueProvider.of(options.getCdfOutputSecret(), secret -> secret.split("\\.")[0]),
+                ValueProvider.NestedValueProvider.of(options.getCdfOutputSecret(), secret -> secret.split("\\.")[1]));
+        ProjectConfig targetConfig = ProjectConfig.create()
+                .withApiKeyFromGcpSecret(targetSecret)
+                .withHost(options.getCdfOutputHost());
+
         Pipeline p = Pipeline.create(options);
 
        /*
@@ -181,6 +235,16 @@ public class ReplicateEvents {
                         .withMapKey("config"))
                 .apply("to map view", View.asMap());
 
+        PCollectionView<List<String>> allowListDataSet = p
+                .apply("Read config allow list", ReadTomlStringArray.from(options.getJobConfigFile())
+                        .withArrayKey("allowList.dataSetExternalId"))
+                .apply("Log data set extId", MapElements.into(TypeDescriptors.strings())
+                        .via(expression -> {
+                            LOG.info("Registered dataSetExternalId: {}", expression);
+                            return expression;
+                        }))
+                .apply("To view", View.asList());
+
         /*
         Read the asset hierarchies from source and target. Shave off the metadata and use id + externalId
         as the basis for mapping TS to assets. Project the resulting asset collections as views so they can be
@@ -188,7 +252,7 @@ public class ReplicateEvents {
          */
         PCollectionView<Map<Long, String>> sourceAssetsIdMap = p
                 .apply("Read source assets", CogniteIO.readAssets()
-                        .withProjectConfigFile(options.getCdfSourceConfigFile())
+                        .withProjectConfig(sourceConfig)
                         .withReaderConfig(ReaderConfig.create()
                                 .withAppIdentifier(appIdentifier)))
                 .apply("Extract id + externalId", MapElements
@@ -199,7 +263,7 @@ public class ReplicateEvents {
 
         PCollectionView<Map<String, Long>> targetAssetsIdMap = p
                 .apply("Read target assets", CogniteIO.readAssets()
-                        .withProjectConfigFile(options.getCdfTargetConfigFile())
+                        .withProjectConfig(targetConfig)
                         .withReaderConfig(ReaderConfig.create()
                                 .withAppIdentifier(appIdentifier)))
                 .apply("Extract externalId + id", MapElements
@@ -209,15 +273,67 @@ public class ReplicateEvents {
                 .apply("To map view", View.asMap());
 
         /*
+        Read the data sets from source and target. Will use these to map items from source data set to
+        a target data set.
+         */
+        PCollectionView<Map<Long, String>> sourceDataSetsIdMap = p
+                .apply("Read source assets", CogniteIO.readDataSets()
+                        .withProjectConfig(sourceConfig)
+                        .withReaderConfig(ReaderConfig.create()
+                                .withAppIdentifier(appIdentifier)))
+                .apply("Select id + externalId", MapElements
+                        .into(TypeDescriptors.kvs(TypeDescriptors.longs(), TypeDescriptors.strings()))
+                        .via((DataSet dataSet) -> KV.of(dataSet.getId().getValue(), dataSet.getExternalId().getValue())))
+                .apply("Max per key", Max.perKey())
+                .apply("To map view", View.asMap());
+
+        PCollectionView<Map<Long, String>> targetDataSetsIdMap = p
+                .apply("Read source assets", CogniteIO.readDataSets()
+                        .withProjectConfig(targetConfig)
+                        .withReaderConfig(ReaderConfig.create()
+                                .withAppIdentifier(appIdentifier)))
+                .apply("Select id + externalId", MapElements
+                        .into(TypeDescriptors.kvs(TypeDescriptors.longs(), TypeDescriptors.strings()))
+                        .via((DataSet dataSet) -> KV.of(dataSet.getId().getValue(), dataSet.getExternalId().getValue())))
+                .apply("Max per key", Max.perKey())
+                .apply("To map view", View.asMap());
+
+        /*
         Read events from source and parse them:
+        - Filter on data set external id
         - Remove system fields (id, created date, last updated date)
         - Translate the asset id links (to be done)
 
         Write the prepared events to target.
          */
         PCollection<Event> eventPCollection = p
-                .apply("Read source events", CogniteIO.readEvents()
-                        .withProjectConfigFile(options.getCdfSourceConfigFile())
+                .apply("Build basic query", Create.of(RequestParameters.create()))
+                .apply("Add dataset filter", ParDo.of(new DoFn<RequestParameters, RequestParameters>() {
+                    @ProcessElement
+                    public void processElement(@Element RequestParameters input,
+                                               OutputReceiver<RequestParameters> out,
+                                               ProcessContext context) {
+                        List<String> allowList = context.sideInput(allowListDataSet);
+                        List<Map<String, String>> datasetExternalIds = new ArrayList<>();
+                        LOG.info("Data set whitelist contains {} entries", allowList.size());
+
+                        //Build the list of data set external id filters
+                        for (String extId : allowList) {
+                            datasetExternalIds.add(ImmutableMap.of("externalId", extId));
+                        }
+
+                        if (datasetExternalIds.isEmpty() || allowList.contains("*")) {
+                            LOG.info("Will not filter on data set external id");
+                            out.output(input);
+                        } else {
+                            LOG.info("Add filter on {} data set external ids.", datasetExternalIds.size());
+                            out.output(input
+                                    .withFilterParameter("dataSetIds", datasetExternalIds));
+                        }
+                    }
+                }).withSideInputs(allowListDataSet))
+                .apply("Read source events", CogniteIO.readAllEvents()
+                        .withProjectConfig(sourceConfig)
                         .withHints(Hints.create()
                                 .withReadShards(1000))
                         .withReaderConfig(ReaderConfig.create()
@@ -225,7 +341,7 @@ public class ReplicateEvents {
                 .apply("Process events", ParDo.of(new PrepareEvents(configMap, sourceAssetsIdMap, targetAssetsIdMap))
                         .withSideInputs(configMap, sourceAssetsIdMap, targetAssetsIdMap))
                 .apply("Write target events", CogniteIO.writeEvents()
-                        .withProjectConfigFile(options.getCdfTargetConfigFile())
+                        .withProjectConfig(targetConfig)
                         .withHints(Hints.create()
                                 .withWriteShards(20))
                         .withWriterConfig(WriterConfig.create()

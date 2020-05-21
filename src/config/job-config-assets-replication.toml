@@ -1,5 +1,10 @@
+# General config options
+[config]
+enableDataSetMapping = "yes"    # yes/no, try mapping the source data set to target data set
+
 # Filters specifying which asset hierarchies to include in the replication
-[blacklist]
+[denyList]
 rootAssetExternalId = []           # leave empty for no blacklist
-[whitelist]
+[allowList]
+dataSetExternalId = ["*"]           # "*" includes all data sets
 rootAssetExternalId = ["*"]        # "*" includes all asset hierarchies

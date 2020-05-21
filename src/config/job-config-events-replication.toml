@@ -1,3 +1,8 @@
 # General config options
 [config]
 enableContextualization = "yes" # yes/no, try linking the events to assets
+enableDataSetMapping = "yes"    # yes/no, try mapping the source data set to target data set
+
+# Filters specifying which time series to include in the replication
+[allowList]
+dataSetExternalId = ["*"]           # "*" includes all data sets

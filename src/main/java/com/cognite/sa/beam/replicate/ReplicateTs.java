@@ -1,14 +1,24 @@
+/*
+ * Copyright 2020 Cognite AS
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.cognite.sa.beam.replicate;
 
 import com.cognite.beam.io.CogniteIO;
-import com.cognite.beam.io.config.Hints;
-import com.cognite.beam.io.config.ReaderConfig;
-import com.cognite.beam.io.config.UpdateFrequency;
-import com.cognite.beam.io.config.WriterConfig;
-import com.cognite.beam.io.dto.Asset;
-import com.cognite.beam.io.dto.TimeseriesMetadata;
-import com.cognite.beam.io.dto.TimeseriesPoint;
-import com.cognite.beam.io.dto.TimeseriesPointPost;
+import com.cognite.beam.io.config.*;
+import com.cognite.beam.io.dto.*;
 import com.cognite.beam.io.servicesV1.RequestParameters;
 import com.cognite.beam.io.transform.BreakFusion;
 import com.cognite.beam.io.transform.GroupIntoBatches;
@@ -35,6 +45,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.regex.Pattern;
 
 /**
  * This pipeline reads TS headers and data points along a rolling time window from the specified cdf instance and writes
@@ -136,21 +147,37 @@ public class ReplicateTs {
      * Custom options for this pipeline.
      */
     public interface ReplicateTsOptions extends PipelineOptions {
-        /**
-         * Specify the source Cdf config file.
-         */
-        @Description("The cdf config file. The name should be in the format of gs://<bucket>/folder.")
+        // The options below can be used for file-based secrets handling.
+        /*
+        @Description("The cdf source config file.The name should be in the format of gs://<bucket>/folder.")
         @Validation.Required
-        ValueProvider<String> getCdfSourceConfigFile();
-        void setCdfSourceConfigFile(ValueProvider<String> value);
+        ValueProvider<String> getCdfInputConfigFile();
+        void setCdfInputConfigFile(ValueProvider<String> value);
 
-        /**
-         * Specify the target Cdf config file.
-         */
-        @Description("The cdf config file. The name should be in the format of gs://<bucket>/folder.")
+        @Description("The cdf target config file. The name should be in the format of gs://<bucket>/folder.")
         @Validation.Required
-        ValueProvider<String> getCdfTargetConfigFile();
-        void setCdfTargetConfigFile(ValueProvider<String> value);
+        ValueProvider<String> getCdfOutputConfigFile();
+        void setCdfOutputConfigFile(ValueProvider<String> value);
+*/
+        @Description("The GCP secret holding the source api key. The reference should be <projectId>.<secretId>.")
+        @Validation.Required
+        ValueProvider<String> getCdfInputSecret();
+        void setCdfInputSecret(ValueProvider<String> value);
+
+        @Description("The CDF source host name. The default value is https://api.cognitedata.com.")
+        @Default.String("https://api.cognitedata.com")
+        ValueProvider<String> getCdfInputHost();
+        void setCdfInputHost(ValueProvider<String> value);
+
+        @Description("The GCP secret holding the target api key. The reference should be <projectId>.<secretId>.")
+        @Validation.Required
+        ValueProvider<String> getCdfOutputSecret();
+        void setCdfOutputSecret(ValueProvider<String> value);
+
+        @Description("The CDF target host name. The default value is https://api.cognitedata.com.")
+        @Default.String("https://api.cognitedata.com")
+        ValueProvider<String> getCdfOutputHost();
+        void setCdfOutputHost(ValueProvider<String> value);
 
         /**
          * Specify the job configuration file.
@@ -165,21 +192,69 @@ public class ReplicateTs {
      * Setup the main pipeline structure and run it.
      * @param options
      */
-    private static PipelineResult runReplicateTs(ReplicateTsOptions options) throws IOException {
+    private static PipelineResult runReplicateTs(ReplicateTsOptions options) {
+        /*
+        Build the project configuration (CDF tenant and api key) based on:
+        - api key from Secret Manager
+        - CDF api host
+         */
+        GcpSecretConfig sourceSecret = GcpSecretConfig.of(
+                ValueProvider.NestedValueProvider.of(options.getCdfInputSecret(), secret -> secret.split("\\.")[0]),
+                ValueProvider.NestedValueProvider.of(options.getCdfInputSecret(), secret -> secret.split("\\.")[1]));
+        ProjectConfig sourceConfig = ProjectConfig.create()
+                .withApiKeyFromGcpSecret(sourceSecret)
+                .withHost(options.getCdfInputHost());
+        GcpSecretConfig targetSecret = GcpSecretConfig.of(
+                ValueProvider.NestedValueProvider.of(options.getCdfOutputSecret(), secret -> secret.split("\\.")[0]),
+                ValueProvider.NestedValueProvider.of(options.getCdfOutputSecret(), secret -> secret.split("\\.")[1]));
+        ProjectConfig targetConfig = ProjectConfig.create()
+                .withApiKeyFromGcpSecret(targetSecret)
+                .withHost(options.getCdfOutputHost());
+
         Pipeline p = Pipeline.create(options);
 
        /*
-        Read the job config file and parse out the blacklist and whitelist.
+        Read the job config file and parse out the allow and deny list.
         Both lists are published as views so they can be used by the transforms as side inputs.
          */
-        PCollectionView<List<String>> tsBlacklist = p
-                .apply("Read config blacklist", ReadTomlStringArray.from(options.getJobConfigFile())
-                        .withArrayKey("blacklist.tsExternalId"))
+        PCollectionView<List<String>> tsDenyList = p
+                .apply("Read ts deny list", ReadTomlStringArray.from(options.getJobConfigFile())
+                        .withArrayKey("denyList.tsExternalId"))
                 .apply("To view", View.asList());
 
-        PCollectionView<List<String>> tsWhitelist = p
-                .apply("Read config whitelist", ReadTomlStringArray.from(options.getJobConfigFile())
-                        .withArrayKey("whitelist.tsExternalId"))
+        PCollectionView<List<String>> tsDenyListRegEx = p
+                .apply("Read ts regEx deny list", ReadTomlStringArray.from(options.getJobConfigFile())
+                        .withArrayKey("denyList.tsExternalIdRegEx"))
+                .apply("Log deny regEx", MapElements.into(TypeDescriptors.strings())
+                        .via(expression -> {
+                            LOG.info("Registered regex: {}", expression);
+                            return expression;
+                        }))
+                .apply("To view", View.asList());
+
+        PCollectionView<List<String>> tsAllowList = p
+                .apply("Read ts allow list", ReadTomlStringArray.from(options.getJobConfigFile())
+                        .withArrayKey("allowList.tsExternalId"))
+                .apply("To view", View.asList());
+
+        PCollectionView<List<String>> tsAllowListRegEx = p
+                .apply("Read ts regEx allow list", ReadTomlStringArray.from(options.getJobConfigFile())
+                        .withArrayKey("allowList.tsExternalIdRegEx"))
+                .apply("Log allow regEx", MapElements.into(TypeDescriptors.strings())
+                        .via(expression -> {
+                            LOG.info("Registered regex: {}", expression);
+                            return expression;
+                        }))
+                .apply("To view", View.asList());
+
+        PCollectionView<List<String>> allowListDataSet = p
+                .apply("Read data set allow list", ReadTomlStringArray.from(options.getJobConfigFile())
+                        .withArrayKey("allowList.dataSetExternalId"))
+                .apply("Log data set extId", MapElements.into(TypeDescriptors.strings())
+                        .via(expression -> {
+                            LOG.info("Registered dataSetExternalId: {}", expression);
+                            return expression;
+                        }))
                 .apply("To view", View.asList());
 
         PCollectionView<Map<String, String>> configMap = p
@@ -194,7 +269,7 @@ public class ReplicateTs {
          */
         PCollectionView<Map<Long, String>> sourceAssetsIdMap = p
                 .apply("Read source assets", CogniteIO.readAssets()
-                        .withProjectConfigFile(options.getCdfSourceConfigFile())
+                        .withProjectConfig(sourceConfig)
                         .withReaderConfig(ReaderConfig.create()
                                 .withAppIdentifier(appIdentifier)))
                 .apply("Extract id + externalId", MapElements
@@ -205,7 +280,7 @@ public class ReplicateTs {
 
         PCollectionView<Map<String, Long>> targetAssetsIdMap = p
                 .apply("Read target assets", CogniteIO.readAssets()
-                        .withProjectConfigFile(options.getCdfTargetConfigFile())
+                        .withProjectConfig(targetConfig)
                         .withReaderConfig(ReaderConfig.create()
                                 .withAppIdentifier(appIdentifier)))
                 .apply("Extract externalId + id", MapElements
@@ -215,13 +290,67 @@ public class ReplicateTs {
                 .apply("To map view", View.asMap());
 
         /*
+        Read the data sets from source and target. Will use these to map items from source data set to
+        a target data set.
+         */
+        PCollectionView<Map<Long, String>> sourceDataSetsIdMap = p
+                .apply("Read source assets", CogniteIO.readDataSets()
+                        .withProjectConfig(sourceConfig)
+                        .withReaderConfig(ReaderConfig.create()
+                                .withAppIdentifier(appIdentifier)))
+                .apply("Select id + externalId", MapElements
+                        .into(TypeDescriptors.kvs(TypeDescriptors.longs(), TypeDescriptors.strings()))
+                        .via((DataSet dataSet) -> KV.of(dataSet.getId().getValue(), dataSet.getExternalId().getValue())))
+                .apply("Max per key", Max.perKey())
+                .apply("To map view", View.asMap());
+
+        PCollectionView<Map<Long, String>> targetDataSetsIdMap = p
+                .apply("Read source assets", CogniteIO.readDataSets()
+                        .withProjectConfig(targetConfig)
+                        .withReaderConfig(ReaderConfig.create()
+                                .withAppIdentifier(appIdentifier)))
+                .apply("Select id + externalId", MapElements
+                        .into(TypeDescriptors.kvs(TypeDescriptors.longs(), TypeDescriptors.strings()))
+                        .via((DataSet dataSet) -> KV.of(dataSet.getId().getValue(), dataSet.getExternalId().getValue())))
+                .apply("Max per key", Max.perKey())
+                .apply("To map view", View.asMap());
+
+        /*
         Read, parse and filter the TS headers.
+        - Filter on data set external id
+        - Filter on security categories
+        - Filter on the externalId white- blacklists
         The TS is filtered in two steps: 1) on security categories and 2) against the blacklist
         and whitelist on externalId.
          */
         PCollection<TimeseriesMetadata> tsHeaders = p
-                .apply("Read Ts headers", CogniteIO.readTimeseriesMetadata()
-                        .withProjectConfigFile(options.getCdfSourceConfigFile())
+                .apply("Build basic query", Create.of(RequestParameters.create()))
+                .apply("Add dataset filter", ParDo.of(new DoFn<RequestParameters, RequestParameters>() {
+                    @ProcessElement
+                    public void processElement(@Element RequestParameters input,
+                                               OutputReceiver<RequestParameters> out,
+                                               ProcessContext context) {
+                        List<String> allowList = context.sideInput(allowListDataSet);
+                        List<Map<String, String>> datasetExternalIds = new ArrayList<>();
+                        LOG.info("Data set whitelist contains {} entries", allowList.size());
+
+                        //Build the list of data set external id filters
+                        for (String extId : allowList) {
+                            datasetExternalIds.add(ImmutableMap.of("externalId", extId));
+                        }
+
+                        if (datasetExternalIds.isEmpty() || allowList.contains("*")) {
+                            LOG.info("Will not filter on data set external id");
+                            out.output(input);
+                        } else {
+                            LOG.info("Add filter on {} data set external ids.", datasetExternalIds.size());
+                            out.output(input
+                                    .withFilterParameter("dataSetIds", datasetExternalIds));
+                        }
+                    }
+                }).withSideInputs(allowListDataSet))
+                .apply("Read Ts headers", CogniteIO.readAllTimeseriesMetadata()
+                        .withProjectConfig(sourceConfig)
                         .withReaderConfig(ReaderConfig.create()
                                 .withAppIdentifier(appIdentifier)))
                 .apply("Filter out TS w/ security categories", Filter.by(
@@ -233,24 +362,55 @@ public class ReplicateTs {
                     public void processElement(@Element TimeseriesMetadata input,
                                                OutputReceiver<TimeseriesMetadata> out,
                                                ProcessContext context) {
-                        List<String> blacklist = context.sideInput(tsBlacklist);
-                        List<String> whitelist = context.sideInput(tsWhitelist);
+                        List<String> blacklist = context.sideInput(tsDenyList);
+                        List<String> whitelist = context.sideInput(tsAllowList);
+                        List<String> blacklistRegEx = context.sideInput(tsDenyListRegEx);
+                        List<String> whitelistRegEx = context.sideInput(tsAllowListRegEx);
 
+                        // Check for blacklist match
                         if (!blacklist.isEmpty() && input.hasExternalId()) {
                             if (blacklist.contains(input.getExternalId().getValue())) {
-                                LOG.info("Blacklist match {}. TS will be dropped.", input.getExternalId().getValue());
+                                LOG.debug("Deny list match {}. TS will be dropped.", input.getExternalId().getValue());
                                 return;
                             }
                         }
 
+                        if (!blacklistRegEx.isEmpty() && input.hasExternalId()) {
+                            for (String regExString : blacklistRegEx) {
+                                if (Pattern.matches(regExString, input.getExternalId().getValue())) {
+                                    LOG.debug("Deny list regEx {} match externalId {}. TS will be dropped.",
+                                            regExString,
+                                            input.getExternalId().getValue());
+                                    return;
+                                }
+                            }
+                        }
+
+                        // Check for whitelist match
                         if (whitelist.contains("*")) {
                             out.output(input);
-                        } else if (whitelist.contains(input.getExternalId().getValue())) {
-                            LOG.info("Whitelist match {}. TS will be included.", input.getExternalId().getValue());
+                            return;
+                        }
+
+                        if (whitelist.contains(input.getExternalId().getValue())) {
+                            LOG.debug("Allow list match {}. TS will be included.", input.getExternalId().getValue());
                             out.output(input);
+                            return;
+                        }
+
+                        if (!whitelistRegEx.isEmpty() && input.hasExternalId()) {
+                            for (String regExString : whitelistRegEx) {
+                                if (Pattern.matches(regExString, input.getExternalId().getValue())) {
+                                    LOG.debug("Allow list regEx {} match externalId {}. TS will be included.",
+                                            regExString,
+                                            input.getExternalId().getValue());
+                                }
+                                out.output(input);
+                                return;
+                            }
                         }
                     }
-                }).withSideInputs(tsBlacklist, tsWhitelist));
+                }).withSideInputs(tsDenyList, tsAllowList, tsDenyListRegEx, tsAllowListRegEx));
 
         /*
         Create target ts header and write:
@@ -273,7 +433,7 @@ public class ReplicateTs {
                 .apply("Process TS headers", ParDo.of(new PrepareTsHeader(configMap, sourceAssetsIdMap, targetAssetsIdMap))
                         .withSideInputs(configMap, sourceAssetsIdMap, targetAssetsIdMap))
                 .apply("Write TS headers", CogniteIO.writeTimeseriesMetadata()
-                        .withProjectConfigFile(options.getCdfTargetConfigFile())
+                        .withProjectConfig(targetConfig)
                         .withHints(Hints.create()
                                 .withWriteShards(20))
                         .withWriterConfig(WriterConfig.create()
@@ -304,11 +464,18 @@ public class ReplicateTs {
                             items.add(ImmutableMap.of("id", ts.getId().getValue()));
                         }
 
+                        Instant fromTime = Instant.now().truncatedTo(ChronoUnit.DAYS); //default
                         int windowDays = Integer.valueOf(config.getOrDefault(tsPointsWindowConfigKey, "1"));
                         //int windowDays = 1;
-                        Instant fromTime = Instant.now().truncatedTo(ChronoUnit.DAYS)
-                                .minus(windowDays, ChronoUnit.DAYS)
-                                .minus(1, ChronoUnit.HOURS);
+
+                        if (windowDays < 0) {
+                            // Run full history for negative time windows.
+                            fromTime = Instant.ofEpochMilli(31536000000L); // Jan 1st, 1971
+                        } else {
+                            fromTime = Instant.now().truncatedTo(ChronoUnit.DAYS)
+                                    .minus(windowDays, ChronoUnit.DAYS)
+                                    .minus(1, ChronoUnit.HOURS);
+                        }
 
                         Instant toTime = Instant.now()
                                 //.truncatedTo(ChronoUnit.DAYS)
@@ -325,7 +492,7 @@ public class ReplicateTs {
                     }
                 }).withSideInputs(configMap))
                 .apply("Read ts points", CogniteIO.readAllTimeseriesPoints()
-                        .withProjectConfigFile(options.getCdfSourceConfigFile())
+                        .withProjectConfig(sourceConfig)
                         .withReaderConfig(ReaderConfig.create()
                                 .withAppIdentifier(appIdentifier)));
 
@@ -337,7 +504,7 @@ public class ReplicateTs {
         tsPoints
                 .apply("Build TS point post object", ParDo.of(new PrepareTsPoint()))
                 .apply("Write ts points", CogniteIO.writeTimeseriesPoints()
-                        .withProjectConfigFile(options.getCdfTargetConfigFile())
+                        .withProjectConfig(targetConfig)
                         .withHints(Hints.create()
                                 .withWriteTsPointsUpdateFrequency(UpdateFrequency.SECOND)
                                 .withWriteShards(2)
@@ -352,7 +519,7 @@ public class ReplicateTs {
      * Read the pipeline options from args and run the pipeline.
      * @param args
      */
-    public static void main(String[] args) throws IOException{
+    public static void main(String[] args) throws IOException {
         ReplicateTsOptions options = PipelineOptionsFactory.fromArgs(args).withValidation().as(ReplicateTsOptions.class);
         runReplicateTs(options);
     }
