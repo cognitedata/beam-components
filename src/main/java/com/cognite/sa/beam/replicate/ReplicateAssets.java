@@ -213,7 +213,7 @@ public class ReplicateAssets {
         a target data set.
          */
         PCollectionView<Map<Long, String>> sourceDataSetsIdMap = p
-                .apply("Read source assets", CogniteIO.readDataSets()
+                .apply("Read source data sets", CogniteIO.readDataSets()
                         .withProjectConfig(sourceConfig)
                         .withReaderConfig(ReaderConfig.create()
                                 .withAppIdentifier(appIdentifier)))
@@ -223,14 +223,14 @@ public class ReplicateAssets {
                 .apply("Max per key", Max.perKey())
                 .apply("To map view", View.asMap());
 
-        PCollectionView<Map<Long, String>> targetDataSetsIdMap = p
-                .apply("Read source assets", CogniteIO.readDataSets()
+        PCollectionView<Map<String, Long>> targetDataSetsExtIdMap = p
+                .apply("Read target data sets", CogniteIO.readDataSets()
                         .withProjectConfig(targetConfig)
                         .withReaderConfig(ReaderConfig.create()
                                 .withAppIdentifier(appIdentifier)))
-                .apply("Select id + externalId", MapElements
-                        .into(TypeDescriptors.kvs(TypeDescriptors.longs(), TypeDescriptors.strings()))
-                        .via((DataSet dataSet) -> KV.of(dataSet.getId().getValue(), dataSet.getExternalId().getValue())))
+                .apply("Select externalId + id", MapElements
+                        .into(TypeDescriptors.kvs(TypeDescriptors.strings(), TypeDescriptors.longs()))
+                        .via((DataSet dataSet) -> KV.of(dataSet.getExternalId().getValue(), dataSet.getId().getValue())))
                 .apply("Max per key", Max.perKey())
                 .apply("To map view", View.asMap());
 
