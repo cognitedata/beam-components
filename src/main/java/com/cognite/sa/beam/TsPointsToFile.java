@@ -35,10 +35,7 @@ import java.time.Instant;
 
 /**
  * This pipeline reads TS data points along a rolling time window from the specified cdp instance and writes
- * them to a target BigQuery table.
- *
- * The job is designed as a batch job which will trucate and write to BQ. That is, it will do a full update
- * with each execution.
+ * them to a target file.
  *
  * This job is prepared to be deployed as a template on GCP (Dataflow) + can be executed directly on any runner.
  */
