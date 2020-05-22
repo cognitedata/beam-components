@@ -52,7 +52,7 @@ public class ReplicateRaw {
     /**
      * Parses the toml configuration entry and extracts the dbNames whitelist entry.
      */
-    private static class ParseDbNameWhitelistFn extends DoFn<String, List<String>> {
+    private static class ParseDbNameAllowListFn extends DoFn<String, List<String>> {
         @ProcessElement
         public void processElement(@Element String tomlString,
                                    OutputReceiver<List<String>> outputReceiver) throws Exception {
@@ -62,13 +62,13 @@ public class ReplicateRaw {
             TomlParseResult parseResult = Toml.parse(tomlString);
             LOG.debug("Finish parsing toml string");
 
-            if (!parseResult.isArray("whitelist.dbName")) {
+            if (!parseResult.isArray("allowList.dbName")) {
                 LOG.warn("dbName is not defined as an array: {}", parseResult.toString());
             }
 
-            TomlArray dbNameArray = parseResult.getArrayOrEmpty("whitelist.dbName");
+            TomlArray dbNameArray = parseResult.getArrayOrEmpty("allowList.dbName");
             if (dbNameArray.isEmpty()) {
-                LOG.warn("Cannot find a dbName array under the whitelist section: {}", parseResult.toString());
+                LOG.warn("Cannot find a dbName array under the allow list section: {}", parseResult.toString());
                 outputReceiver.output(outputList);
                 return;
             }
@@ -185,7 +185,7 @@ public class ReplicateRaw {
 
         // Parse dbName whitelist to side input
         PCollectionView<List<String>> dbNameWhitelistView = jobConfig
-                .apply("Extract dbName whitelist", ParDo.of(new ParseDbNameWhitelistFn()))
+                .apply("Extract dbName allow list", ParDo.of(new ParseDbNameAllowListFn()))
                 .apply("To singleton view", View.asSingleton());
 
         // Read all raw db and table names.

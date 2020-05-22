@@ -1,2 +1,2 @@
-[whitelist]
+[allowList]
 dbName = ["proarc"]
