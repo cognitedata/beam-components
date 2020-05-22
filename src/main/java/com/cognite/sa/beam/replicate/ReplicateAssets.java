@@ -20,15 +20,17 @@ import com.cognite.beam.io.CogniteIO;
 import com.cognite.beam.io.config.*;
 import com.cognite.beam.io.dto.Asset;
 import com.cognite.beam.io.dto.DataSet;
-import com.cognite.beam.io.dto.Event;
 import com.cognite.beam.io.servicesV1.RequestParameters;
 import com.cognite.beam.io.transform.toml.ReadTomlStringArray;
 import com.cognite.beam.io.transform.toml.ReadTomlStringMap;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.protobuf.Int64Value;
 import com.google.protobuf.StringValue;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.PipelineResult;
+import org.apache.beam.sdk.metrics.Counter;
+import org.apache.beam.sdk.metrics.Metrics;
 import org.apache.beam.sdk.options.*;
 import org.apache.beam.sdk.transforms.*;
 import org.apache.beam.sdk.values.*;
@@ -52,18 +54,34 @@ public class ReplicateAssets {
     // The log to output status messages to.
     private static final Logger LOG = LoggerFactory.getLogger(ReplicateAssets.class);
     private static final String appIdentifier = "Replicate_Assets";
+    private static final String dataSetConfigKey = "enableDataSetMapping";
 
     /**
      * Create target asset:
      *         - Remove system fields (id, created date, last updated date, parentId)
      *         - Translate the asset id links to externalParentId
      *         - Set the key to the rootAssetExternalId
+     *         - Map data set ids.
      */
     private static class PrepareAssets extends DoFn<Asset, KV<String, Asset>> {
+        PCollectionView<Map<String, String>> configMap;
         PCollectionView<Map<Long, String>> sourceAssetsIdMapView;
+        PCollectionView<Map<Long, String>> sourceDataSetsIdMapView;
+        PCollectionView<Map<String, Long>> targetDataSetsExtIdMapView;
 
-        PrepareAssets(PCollectionView<Map<Long, String>> sourceAssetsIdMap) {
+        final Counter dataSetMapCounter = Metrics.counter(ReplicateAssets.PrepareAssets.class,
+                "Map data set");
+        final Counter rootAssetCounter = Metrics.counter(ReplicateAssets.PrepareAssets.class,
+                "Root assets");
+
+        PrepareAssets(PCollectionView<Map<String, String>> configMap,
+                      PCollectionView<Map<Long, String>> sourceAssetsIdMap,
+                      PCollectionView<Map<Long, String>> sourceDataSetsIdMap,
+                      PCollectionView<Map<String, Long>> targetDataSetsExtIdMap) {
+            this.configMap = configMap;
             this.sourceAssetsIdMapView = sourceAssetsIdMap;
+            this.sourceDataSetsIdMapView = sourceDataSetsIdMap;
+            this.targetDataSetsExtIdMapView = targetDataSetsExtIdMap;
         }
 
         @ProcessElement
@@ -73,15 +91,33 @@ public class ReplicateAssets {
             Preconditions.checkArgument(input.hasExternalId(), "Source assets must have an externalId.");
             Preconditions.checkArgument(input.hasRootId(), "Source assets must have a rootId");
             Map<Long, String> sourceAssetsIdMap = context.sideInput(sourceAssetsIdMapView);
+            Map<Long, String> sourceDataSetsIdMap = context.sideInput(sourceDataSetsIdMapView);
+            Map<String, Long> targetDataSetsExtIdMap = context.sideInput(targetDataSetsExtIdMapView);
+            Map<String, String> config = context.sideInput(configMap);
 
-            Asset.Builder builder = Asset.newBuilder(input);
-            builder.clearCreatedTime();
-            builder.clearLastUpdatedTime();
-            builder.clearId();
-            builder.clearParentId();
+            Asset.Builder builder = input.toBuilder()
+                    .clearCreatedTime()
+                    .clearLastUpdatedTime()
+                    .clearId()
+                    .clearParentId()
+                    .clearDataSetId();
 
             if (sourceAssetsIdMap.containsKey(input.getParentId().getValue())) {
                 builder.setParentExternalId(StringValue.of(sourceAssetsIdMap.get(input.getParentId().getValue())));
+            } else {
+                // No parent to map to--will be a root asset.
+                rootAssetCounter.inc();
+            }
+
+            // map data set if enabled and it is available in the target
+            if (config.getOrDefault(dataSetConfigKey, "no").equalsIgnoreCase("yes")
+                    && input.hasDataSetId()) {
+                String targetDataSetExtId = sourceDataSetsIdMap.getOrDefault(
+                        input.getDataSetId().getValue(), String.valueOf(input.getDataSetId().getValue()));
+                if (targetDataSetsExtIdMap.containsKey(targetDataSetExtId)) {
+                    builder.setDataSetId(Int64Value.of(targetDataSetsExtIdMap.get(targetDataSetExtId)));
+                    dataSetMapCounter.inc();
+                }
             }
 
             out.output(KV.of(sourceAssetsIdMap.getOrDefault(input.getRootId().getValue(),
@@ -175,12 +211,22 @@ public class ReplicateAssets {
         PCollectionView<List<String>> assetDenyList = p
                 .apply("Read asset deny list", ReadTomlStringArray.from(options.getJobConfigFile())
                         .withArrayKey("denyList.rootAssetExternalId"))
+                .apply("Log asset deny", MapElements.into(TypeDescriptors.strings())
+                        .via(expression -> {
+                            LOG.info("Registered root asset extId deny: {}", expression);
+                            return expression;
+                        }))
                 .apply("To view", View.asList());
 
         PCollectionView<List<String>> assetAllowList = p
                 .apply("Read asset allow list", ReadTomlStringArray.from(options.getJobConfigFile())
                         .withArrayKey("allowList.rootAssetExternalId"))
-                .apply("To view", View.asList());
+                .apply("Log asset allow", MapElements.into(TypeDescriptors.strings())
+                        .via(expression -> {
+                            LOG.info("Registered root asset extId allow: {}", expression);
+                            return expression;
+                        }))
+                .apply("View", View.asList());
 
         PCollectionView<List<String>> allowListDataSet = p
                 .apply("Read data set allow list", ReadTomlStringArray.from(options.getJobConfigFile())
@@ -277,8 +323,9 @@ public class ReplicateAssets {
                                 .withReadShards(100))
                         .withReaderConfig(ReaderConfig.create()
                                 .withAppIdentifier(appIdentifier)))
-                .apply("Process assets", ParDo.of(new PrepareAssets(sourceAssetsIdMap))
-                        .withSideInputs(sourceAssetsIdMap))
+                .apply("Process assets", ParDo.of(new PrepareAssets(configMap, sourceAssetsIdMap,
+                        sourceDataSetsIdMap, targetDataSetsExtIdMap))
+                        .withSideInputs(configMap, sourceAssetsIdMap, sourceDataSetsIdMap, targetDataSetsExtIdMap))
                 .apply("Filter assets", ParDo.of(new DoFn<KV<String, Asset>, KV<String, Asset>>() {
                     @ProcessElement
                     public void processElement(@Element KV<String, Asset> input,

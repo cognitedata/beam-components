@@ -23,11 +23,12 @@ import com.cognite.beam.io.servicesV1.RequestParameters;
 import com.cognite.beam.io.transform.toml.ReadTomlStringArray;
 import com.cognite.beam.io.transform.toml.ReadTomlStringMap;
 import com.google.common.collect.ImmutableMap;
-import com.google.protobuf.ExperimentalApi;
 import com.google.protobuf.Int64Value;
 import com.google.protobuf.StringValue;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.PipelineResult;
+import org.apache.beam.sdk.metrics.Counter;
+import org.apache.beam.sdk.metrics.Metrics;
 import org.apache.beam.sdk.options.*;
 import org.apache.beam.sdk.transforms.*;
 import org.apache.beam.sdk.values.KV;
@@ -54,24 +55,39 @@ public class ReplicateEvents {
     private static final Logger LOG = LoggerFactory.getLogger(ReplicateEvents.class);
     private static final String appIdentifier = "Replicate_Events";
     private static final String contextualizationConfigKey = "enableContextualization";
+    private static final String dataSetConfigKey = "enableDataSetMapping";
 
     /**
      * Create target event:
      *         - Remove system fields (id, created date, last updated date)
      *         - Translate the asset id links
      *         - If the headers does not have externalId, use the source's id
+     *         - Map data set ids
      */
     private static class PrepareEvents extends DoFn<Event, Event> {
         PCollectionView<Map<String, String>> configMap;
         PCollectionView<Map<Long, String>> sourceAssetsIdMapView;
         PCollectionView<Map<String, Long>> targetAssetsIdMapView;
+        PCollectionView<Map<Long, String>> sourceDataSetsIdMapView;
+        PCollectionView<Map<String, Long>> targetDataSetsExtIdMapView;
+
+        final Counter missingExtCounter = Metrics.counter(ReplicateEvents.PrepareEvents.class,
+                "No external id");
+        final Counter assetMapCounter = Metrics.counter(ReplicateEvents.PrepareEvents.class,
+                "Map asset ids");
+        final Counter dataSetMapCounter = Metrics.counter(ReplicateEvents.PrepareEvents.class,
+                "Map data set");
 
         PrepareEvents(PCollectionView<Map<String, String>> configMap,
                       PCollectionView<Map<Long, String>> sourceAssetsIdMap,
-                      PCollectionView<Map<String, Long>> targetAssetsIdMapView) {
+                      PCollectionView<Map<String, Long>> targetAssetsIdMap,
+                      PCollectionView<Map<Long, String>> sourceDataSetsIdMap,
+                      PCollectionView<Map<String, Long>> targetDataSetsExtIdMap) {
             this.configMap = configMap;
             this.sourceAssetsIdMapView = sourceAssetsIdMap;
-            this.targetAssetsIdMapView = targetAssetsIdMapView;
+            this.targetAssetsIdMapView = targetAssetsIdMap;
+            this.sourceDataSetsIdMapView = sourceDataSetsIdMap;
+            this.targetDataSetsExtIdMapView = targetDataSetsExtIdMap;
         }
 
         @ProcessElement
@@ -80,16 +96,20 @@ public class ReplicateEvents {
                                    ProcessContext context) {
             Map<Long, String> sourceAssetsIdMap = context.sideInput(sourceAssetsIdMapView);
             Map<String, Long> targetAssetsIdMap = context.sideInput(targetAssetsIdMapView);
+            Map<Long, String> sourceDataSetsIdMap = context.sideInput(sourceDataSetsIdMapView);
+            Map<String, Long> targetDataSetsExtIdMap = context.sideInput(targetDataSetsExtIdMapView);
             Map<String, String> config = context.sideInput(configMap);
 
-            Event.Builder builder = Event.newBuilder(input);
-            builder.clearAssetIds();
-            builder.clearCreatedTime();
-            builder.clearLastUpdatedTime();
-            builder.clearId();
+            Event.Builder builder = input.toBuilder()
+                    .clearAssetIds()
+                    .clearCreatedTime()
+                    .clearLastUpdatedTime()
+                    .clearId()
+                    .clearDataSetId();
 
             if (!input.hasExternalId()) {
                 builder.setExternalId(StringValue.of(String.valueOf(input.getId().getValue())));
+                missingExtCounter.inc();
             }
 
             // add asset link if enabled and it is available in the target
@@ -102,6 +122,18 @@ public class ReplicateEvents {
                     if (targetAssetsIdMap.containsKey(targetAssetExtId)) {
                         builder.addAssetIds(targetAssetsIdMap.get(targetAssetExtId));
                     }
+                }
+                if (builder.getAssetIdsCount() > 0) assetMapCounter.inc();
+            }
+
+            // map data set if enabled and it is available in the target
+            if (config.getOrDefault(dataSetConfigKey, "no").equalsIgnoreCase("yes")
+                    && input.hasDataSetId()) {
+                String targetDataSetExtId = sourceDataSetsIdMap.getOrDefault(
+                        input.getDataSetId().getValue(), String.valueOf(input.getDataSetId().getValue()));
+                if (targetDataSetsExtIdMap.containsKey(targetDataSetExtId)) {
+                    builder.setDataSetId(Int64Value.of(targetDataSetsExtIdMap.get(targetDataSetExtId)));
+                    dataSetMapCounter.inc();
                 }
             }
 
@@ -338,8 +370,10 @@ public class ReplicateEvents {
                                 .withReadShards(1000))
                         .withReaderConfig(ReaderConfig.create()
                                 .withAppIdentifier(appIdentifier)))
-                .apply("Process events", ParDo.of(new PrepareEvents(configMap, sourceAssetsIdMap, targetAssetsIdMap))
-                        .withSideInputs(configMap, sourceAssetsIdMap, targetAssetsIdMap))
+                .apply("Process events", ParDo.of(new PrepareEvents(configMap, sourceAssetsIdMap,
+                        targetAssetsIdMap, sourceDataSetsIdMap, targetDataSetsExtIdMap))
+                        .withSideInputs(configMap, sourceAssetsIdMap, targetAssetsIdMap,
+                                sourceDataSetsIdMap, targetDataSetsExtIdMap))
                 .apply("Write target events", CogniteIO.writeEvents()
                         .withProjectConfig(targetConfig)
                         .withHints(Hints.create()

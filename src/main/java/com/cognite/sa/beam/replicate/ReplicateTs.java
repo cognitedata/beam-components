@@ -32,6 +32,8 @@ import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.coders.KvCoder;
 import org.apache.beam.sdk.coders.VarIntCoder;
 import org.apache.beam.sdk.extensions.protobuf.ProtoCoder;
+import org.apache.beam.sdk.metrics.Counter;
+import org.apache.beam.sdk.metrics.Metrics;
 import org.apache.beam.sdk.options.*;
 import org.apache.beam.sdk.transforms.*;
 import org.apache.beam.sdk.values.*;
@@ -62,6 +64,7 @@ public class ReplicateTs {
     private static final String tsPointsConfigKey = "tsPoints";
     private static final String tsPointsWindowConfigKey = "tsPointsWindowDays";
     private static final String contextualizationConfigKey = "enableContextualization";
+    private static final String dataSetConfigKey = "enableDataSetMapping";
 
     /**
      * Create target ts point:
@@ -95,18 +98,32 @@ public class ReplicateTs {
      *         - Remove system fields (id, created date, last updated date, security categories)
      *         - Translate the asset id links
      *         - If the headers does not have externalId, use the source's id
+     *         - Map data set ids
      */
     private static class PrepareTsHeader extends DoFn<TimeseriesMetadata, TimeseriesMetadata> {
         PCollectionView<Map<String, String>> configMap;
         PCollectionView<Map<Long, String>> sourceAssetsIdMapView;
         PCollectionView<Map<String, Long>> targetAssetsIdMapView;
+        PCollectionView<Map<Long, String>> sourceDataSetsIdMapView;
+        PCollectionView<Map<String, Long>> targetDataSetsExtIdMapView;
+
+        final Counter missingExtCounter = Metrics.counter(ReplicateTs.PrepareTsHeader.class,
+                "No external id");
+        final Counter assetMapCounter = Metrics.counter(ReplicateTs.PrepareTsHeader.class,
+                "Map asset ids");
+        final Counter dataSetMapCounter = Metrics.counter(ReplicateTs.PrepareTsHeader.class,
+                "Map data set");
 
         PrepareTsHeader(PCollectionView<Map<String, String>> configMap,
                         PCollectionView<Map<Long, String>> sourceAssetsIdMap,
-                        PCollectionView<Map<String, Long>> targetAssetsIdMapView) {
+                        PCollectionView<Map<String, Long>> targetAssetsIdMapView,
+                        PCollectionView<Map<Long, String>> sourceDataSetsIdMap,
+                        PCollectionView<Map<String, Long>> targetDataSetsExtIdMap) {
             this.configMap = configMap;
             this.sourceAssetsIdMapView = sourceAssetsIdMap;
             this.targetAssetsIdMapView = targetAssetsIdMapView;
+            this.sourceDataSetsIdMapView = sourceDataSetsIdMap;
+            this.targetDataSetsExtIdMapView = targetDataSetsExtIdMap;
         }
 
         @ProcessElement
@@ -115,17 +132,21 @@ public class ReplicateTs {
                                    ProcessContext context) {
             Map<Long, String> sourceAssetsIdMap = context.sideInput(sourceAssetsIdMapView);
             Map<String, Long> targetAssetsIdMap = context.sideInput(targetAssetsIdMapView);
+            Map<Long, String> sourceDataSetsIdMap = context.sideInput(sourceDataSetsIdMapView);
+            Map<String, Long> targetDataSetsExtIdMap = context.sideInput(targetDataSetsExtIdMapView);
             Map<String, String> config = context.sideInput(configMap);
 
-            TimeseriesMetadata.Builder builder = TimeseriesMetadata.newBuilder(input);
-            builder.clearAssetId();
-            builder.clearCreatedTime();
-            builder.clearLastUpdatedTime();
-            builder.clearId();
-            builder.clearSecurityCategories();
+            TimeseriesMetadata.Builder builder = input.toBuilder()
+                    .clearAssetId()
+                    .clearCreatedTime()
+                    .clearLastUpdatedTime()
+                    .clearId()
+                    .clearSecurityCategories()
+                    .clearDataSetId();
 
             if (!input.hasExternalId()) {
                 builder.setExternalId(StringValue.of(String.valueOf(input.getId().getValue())));
+                missingExtCounter.inc();
             }
 
             // add asset link if enabled and it is available in the target
@@ -137,8 +158,21 @@ public class ReplicateTs {
 
                 if (targetAssetsIdMap.containsKey(targetAssetExtId)) {
                     builder.setAssetId(Int64Value.of(targetAssetsIdMap.get(targetAssetExtId)));
+                    assetMapCounter.inc();
                 }
             }
+
+            // map data set if enabled and it is available in the target
+            if (config.getOrDefault(dataSetConfigKey, "no").equalsIgnoreCase("yes")
+                    && input.hasDataSetId()) {
+                String targetDataSetExtId = sourceDataSetsIdMap.getOrDefault(
+                        input.getDataSetId().getValue(), String.valueOf(input.getDataSetId().getValue()));
+                if (targetDataSetsExtIdMap.containsKey(targetDataSetExtId)) {
+                    builder.setDataSetId(Int64Value.of(targetDataSetsExtIdMap.get(targetDataSetExtId)));
+                    dataSetMapCounter.inc();
+                }
+            }
+
             out.output(builder.build());
         }
     }
@@ -220,6 +254,11 @@ public class ReplicateTs {
         PCollectionView<List<String>> tsDenyList = p
                 .apply("Read ts deny list", ReadTomlStringArray.from(options.getJobConfigFile())
                         .withArrayKey("denyList.tsExternalId"))
+                .apply("Log ts deny", MapElements.into(TypeDescriptors.strings())
+                        .via(expression -> {
+                            LOG.info("Registered ts extId deny: {}", expression);
+                            return expression;
+                        }))
                 .apply("To view", View.asList());
 
         PCollectionView<List<String>> tsDenyListRegEx = p
@@ -227,7 +266,7 @@ public class ReplicateTs {
                         .withArrayKey("denyList.tsExternalIdRegEx"))
                 .apply("Log deny regEx", MapElements.into(TypeDescriptors.strings())
                         .via(expression -> {
-                            LOG.info("Registered regex: {}", expression);
+                            LOG.info("Registered ts regex deny: {}", expression);
                             return expression;
                         }))
                 .apply("To view", View.asList());
@@ -235,6 +274,11 @@ public class ReplicateTs {
         PCollectionView<List<String>> tsAllowList = p
                 .apply("Read ts allow list", ReadTomlStringArray.from(options.getJobConfigFile())
                         .withArrayKey("allowList.tsExternalId"))
+                .apply("Log ts allow", MapElements.into(TypeDescriptors.strings())
+                        .via(expression -> {
+                            LOG.info("Registered ts extId allow: {}", expression);
+                            return expression;
+                        }))
                 .apply("To view", View.asList());
 
         PCollectionView<List<String>> tsAllowListRegEx = p
@@ -242,7 +286,7 @@ public class ReplicateTs {
                         .withArrayKey("allowList.tsExternalIdRegEx"))
                 .apply("Log allow regEx", MapElements.into(TypeDescriptors.strings())
                         .via(expression -> {
-                            LOG.info("Registered regex: {}", expression);
+                            LOG.info("Registered ts allow regex: {}", expression);
                             return expression;
                         }))
                 .apply("To view", View.asList());
@@ -430,8 +474,10 @@ public class ReplicateTs {
                         }
                     }
                 }).withSideInputs(configMap))
-                .apply("Process TS headers", ParDo.of(new PrepareTsHeader(configMap, sourceAssetsIdMap, targetAssetsIdMap))
-                        .withSideInputs(configMap, sourceAssetsIdMap, targetAssetsIdMap))
+                .apply("Process TS headers", ParDo.of(new PrepareTsHeader(configMap, sourceAssetsIdMap,
+                        targetAssetsIdMap, sourceDataSetsIdMap, targetDataSetsExtIdMap))
+                        .withSideInputs(configMap, sourceAssetsIdMap, targetAssetsIdMap,
+                                sourceDataSetsIdMap, targetDataSetsExtIdMap))
                 .apply("Write TS headers", CogniteIO.writeTimeseriesMetadata()
                         .withProjectConfig(targetConfig)
                         .withHints(Hints.create()
