@@ -168,10 +168,11 @@ public class CdfTsPointsBQ {
                         .withProjectConfig(projectConfig)
                         .withReaderConfig(ReaderConfig.create()
                                 .withAppIdentifier("CdfTsPointsBQ")
-                                .enableDeltaRead("system.bq-delta")
-                                .withDeltaIdentifier("ts-points")
-                                .withDeltaOffset(Duration.ofMinutes(2))
-                                .withFullReadOverride(options.getFullRead())));
+                                //.enableDeltaRead("system.bq-delta")
+                                //.withDeltaIdentifier("ts-points")
+                                //.withDeltaOffset(Duration.ofMinutes(2))
+                                //.withFullReadOverride(options.getFullRead())
+                        ));
 
         // Write to BQ
         tsPoints.apply("Write output to BQ", BigQueryIO.<TimeseriesPoint>write()
