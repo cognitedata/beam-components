@@ -38,6 +38,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
@@ -166,7 +167,11 @@ public class CdfTsPointsBQ {
                 .apply("Read ts points", CogniteIO.readAllTimeseriesPoints()
                         .withProjectConfig(projectConfig)
                         .withReaderConfig(ReaderConfig.create()
-                                .withAppIdentifier("CdfTsPointsBQ")));
+                                .withAppIdentifier("CdfTsPointsBQ")
+                                .enableDeltaRead("system.bq-delta")
+                                .withDeltaIdentifier("ts-points")
+                                .withDeltaOffset(Duration.ofMinutes(2))
+                                .withFullReadOverride(options.getFullRead())));
 
         // Write to BQ
         tsPoints.apply("Write output to BQ", BigQueryIO.<TimeseriesPoint>write()
