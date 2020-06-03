@@ -2,7 +2,7 @@
 [config]
 tsHeaders = "yes"               # synch ts headers
 tsPoints = "yes"                # synch ts points
-tsPointsWindowDays = "1"        # the time window (in days) for ts points synch
+tsPointsWindowDays = "1"        # the time window (in days) for ts points synch, use "-1" for full history
 enableContextualization = "no" # yes/no, try linking the TS headers to assets
 enableDataSetMapping = "yes"    # yes/no, try mapping the source data set to target data set
 

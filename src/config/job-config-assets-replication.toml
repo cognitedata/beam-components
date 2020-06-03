@@ -4,7 +4,7 @@ enableDataSetMapping = "yes"    # yes/no, try mapping the source data set to tar
 
 # Filters specifying which asset hierarchies to include in the replication
 [denyList]
-rootAssetExternalId = []           # leave empty for no blacklist
+rootAssetExternalId = []           # leave empty for no deny list
 [allowList]
 dataSetExternalId = ["*"]           # "*" includes all data sets
 rootAssetExternalId = ["*"]        # "*" includes all asset hierarchies
