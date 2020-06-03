@@ -2,17 +2,29 @@
   "name": "Events replicator",
   "description": "Replicates events from one CDF instance to another.",
   "parameters": [{
-    "name": "cdfSourceConfigFile",
-    "label": "CDF source project configuration file",
-    "help_text": "CDF project configuration file for the source. ex: gs://MyBucket/project-config.toml",
-    "is_optional": false
-  },
-   {
-     "name": "cdfTargetConfigFile",
-     "label": "CDF target project configuration file",
-     "help_text": "CDF configuration file for the target. ex: gs://MyBucket/project-config.toml",
+     "name": "CdfInputSecret",
+     "label": "CDF source api key--Secret Manager reference",
+     "help_text": "CDF source api key--Secret Manager reference. ex: <gcp-project-id>.<secret-id>",
      "is_optional": false
    },
+    {
+      "name": "CdfInputHost",
+      "label": "CDF api host",
+      "help_text": "CDF api host. ex: https://api.cognitedata.com",
+      "is_optional": true
+    },
+    {
+        "name": "CdfOutputSecret",
+        "label": "CDF target api key--Secret Manager reference",
+        "help_text": "CDF target api key--Secret Manager reference. ex: <gcp-project-id>.<secret-id>",
+        "is_optional": false
+      },
+      {
+           "name": "CdfOutputHost",
+           "label": "CDF api host",
+           "help_text": "CDF api host. ex: https://api.cognitedata.com",
+           "is_optional": true
+         },
   {
     "name": "jobConfigFile",
     "label": "The configuration file for the job",
