@@ -269,7 +269,8 @@ public class ReplicateAssets {
                 .apply("Read source data sets", CogniteIO.readDataSets()
                         .withProjectConfig(sourceConfig)
                         .withReaderConfig(ReaderConfig.create()
-                                .withAppIdentifier(appIdentifier)))
+                                .withAppIdentifier(appIdentifier)
+                                .enableMetrics(false)))
                 .apply("Select id + externalId", MapElements
                         .into(TypeDescriptors.kvs(TypeDescriptors.longs(), TypeDescriptors.strings()))
                         .via((DataSet dataSet) -> {
@@ -287,7 +288,8 @@ public class ReplicateAssets {
                 .apply("Read target data sets", CogniteIO.readDataSets()
                         .withProjectConfig(targetConfig)
                         .withReaderConfig(ReaderConfig.create()
-                                .withAppIdentifier(appIdentifier)))
+                                .withAppIdentifier(appIdentifier)
+                                .enableMetrics(false)))
                 .apply("Select externalId + id", MapElements
                         .into(TypeDescriptors.kvs(TypeDescriptors.strings(), TypeDescriptors.longs()))
                         .via((DataSet dataSet) -> {

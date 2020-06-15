@@ -293,7 +293,8 @@ public class ReplicateEvents {
                 .apply("Read source assets", CogniteIO.readAssets()
                         .withProjectConfig(sourceConfig)
                         .withReaderConfig(ReaderConfig.create()
-                                .withAppIdentifier(appIdentifier)))
+                                .withAppIdentifier(appIdentifier)
+                                .enableMetrics(false)))
                 .apply("Extract id + externalId", MapElements
                         .into(TypeDescriptors.kvs(TypeDescriptors.longs(), TypeDescriptors.strings()))
                         .via((Asset asset) -> KV.of(asset.getId().getValue(), asset.getExternalId().getValue())))
@@ -304,7 +305,8 @@ public class ReplicateEvents {
                 .apply("Read target assets", CogniteIO.readAssets()
                         .withProjectConfig(targetConfig)
                         .withReaderConfig(ReaderConfig.create()
-                                .withAppIdentifier(appIdentifier)))
+                                .withAppIdentifier(appIdentifier)
+                                .enableMetrics(false)))
                 .apply("Extract externalId + id", MapElements
                         .into(TypeDescriptors.kvs(TypeDescriptors.strings(), TypeDescriptors.longs()))
                         .via((Asset asset) -> KV.of(asset.getExternalId().getValue(), asset.getId().getValue())))
@@ -319,7 +321,8 @@ public class ReplicateEvents {
                 .apply("Read source data sets", CogniteIO.readDataSets()
                         .withProjectConfig(sourceConfig)
                         .withReaderConfig(ReaderConfig.create()
-                                .withAppIdentifier(appIdentifier)))
+                                .withAppIdentifier(appIdentifier)
+                                .enableMetrics(false)))
                 .apply("Select id + externalId", MapElements
                         .into(TypeDescriptors.kvs(TypeDescriptors.longs(), TypeDescriptors.strings()))
                         .via((DataSet dataSet) -> {
@@ -337,7 +340,8 @@ public class ReplicateEvents {
                 .apply("Read target data sets", CogniteIO.readDataSets()
                         .withProjectConfig(targetConfig)
                         .withReaderConfig(ReaderConfig.create()
-                                .withAppIdentifier(appIdentifier)))
+                                .withAppIdentifier(appIdentifier)
+                                .enableMetrics(false)))
                 .apply("Select externalId + id", MapElements
                         .into(TypeDescriptors.kvs(TypeDescriptors.strings(), TypeDescriptors.longs()))
                         .via((DataSet dataSet) -> {
