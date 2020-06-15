@@ -206,6 +206,13 @@ public class ReplicateAssets {
         PCollectionView<Map<String, String>> configMap = p
                 .apply("Read config map", ReadTomlStringMap.from(options.getJobConfigFile())
                         .withMapKey("config"))
+                .apply("Log config", MapElements
+                        .into(TypeDescriptors.kvs(TypeDescriptors.strings(), TypeDescriptors.strings()))
+                        .via((KV<String, String> config) -> {
+                            LOG.info("Config entry: {}", config);
+                            return config;
+                        })
+                )
                 .apply("to map view", View.asMap());
 
         PCollectionView<List<String>> assetDenyList = p
