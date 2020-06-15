@@ -7,6 +7,9 @@ enableContextualization = "no" # yes/no, try linking the TS headers to assets
 enableDataSetMapping = "yes"    # yes/no, try mapping the source data set to target data set
 
 # Filters specifying which time series to include in the replication
+# The exact match on externalId is unioned with the regex expression.
+# The regEx expression must be entered as a Java String. I.e. double escape characters.
+# Example: "\\d" for digit, "\\\\" for backslash.
 [denyList]
 tsExternalIdRegEx = []      # leave empty for no blacklist
 tsExternalId = []           # no blacklisting
