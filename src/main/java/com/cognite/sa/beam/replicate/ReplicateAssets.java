@@ -265,7 +265,14 @@ public class ReplicateAssets {
                                 .withAppIdentifier(appIdentifier)))
                 .apply("Select id + externalId", MapElements
                         .into(TypeDescriptors.kvs(TypeDescriptors.longs(), TypeDescriptors.strings()))
-                        .via((DataSet dataSet) -> KV.of(dataSet.getId().getValue(), dataSet.getExternalId().getValue())))
+                        .via((DataSet dataSet) -> {
+                            LOG.info("Source dataset - id: {}, extId: {}, name: {}",
+                                    dataSet.getId().getValue(),
+                                    dataSet.getExternalId().getValue(),
+                                    dataSet.getName().getValue());
+                            return KV.of(dataSet.getId().getValue(), dataSet.getExternalId().getValue());
+                                }
+                                ))
                 .apply("Max per key", Max.perKey())
                 .apply("To map view", View.asMap());
 
@@ -276,7 +283,14 @@ public class ReplicateAssets {
                                 .withAppIdentifier(appIdentifier)))
                 .apply("Select externalId + id", MapElements
                         .into(TypeDescriptors.kvs(TypeDescriptors.strings(), TypeDescriptors.longs()))
-                        .via((DataSet dataSet) -> KV.of(dataSet.getExternalId().getValue(), dataSet.getId().getValue())))
+                        .via((DataSet dataSet) -> {
+                            LOG.info("Target dataset - id: {}, extId: {}, name: {}",
+                                    dataSet.getId().getValue(),
+                                    dataSet.getExternalId().getValue(),
+                                    dataSet.getName().getValue());
+                            return KV.of(dataSet.getExternalId().getValue(), dataSet.getId().getValue());
+                                }
+                                ))
                 .apply("Max per key", Max.perKey())
                 .apply("To map view", View.asMap());
 
