@@ -377,7 +377,8 @@ public class ReplicateAssets {
                 .apply("Synchronize target assets", CogniteIO.synchronizeHierarchies()
                         .withProjectConfig(targetConfig)
                         .withWriterConfig(WriterConfig.create()
-                                .withAppIdentifier(appIdentifier)));
+                                .withAppIdentifier(appIdentifier)
+                                .withUpsertMode(UpsertMode.REPLACE)));
 
         return p.run();
     }
