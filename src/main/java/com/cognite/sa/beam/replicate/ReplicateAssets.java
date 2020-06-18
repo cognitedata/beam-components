@@ -255,6 +255,7 @@ public class ReplicateAssets {
                         .withProjectConfig(sourceConfig)
                         .withReaderConfig(ReaderConfig.create()
                                 .withAppIdentifier(appIdentifier)))
+                .apply("Filter on extId", Filter.by(item -> item.hasExternalId()))
                 .apply("Extract id + externalId", MapElements
                         .into(TypeDescriptors.kvs(TypeDescriptors.longs(), TypeDescriptors.strings()))
                         .via((Asset asset) -> KV.of(asset.getId().getValue(), asset.getExternalId().getValue())))
@@ -271,6 +272,7 @@ public class ReplicateAssets {
                         .withReaderConfig(ReaderConfig.create()
                                 .withAppIdentifier(appIdentifier)
                                 .enableMetrics(false)))
+                .apply("Filter on extId", Filter.by(item -> item.hasExternalId()))
                 .apply("Select id + externalId", MapElements
                         .into(TypeDescriptors.kvs(TypeDescriptors.longs(), TypeDescriptors.strings()))
                         .via((DataSet dataSet) -> {
@@ -290,6 +292,7 @@ public class ReplicateAssets {
                         .withReaderConfig(ReaderConfig.create()
                                 .withAppIdentifier(appIdentifier)
                                 .enableMetrics(false)))
+                .apply("Filter on extId", Filter.by(item -> item.hasExternalId()))
                 .apply("Select externalId + id", MapElements
                         .into(TypeDescriptors.kvs(TypeDescriptors.strings(), TypeDescriptors.longs()))
                         .via((DataSet dataSet) -> {
