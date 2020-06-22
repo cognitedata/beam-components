@@ -404,7 +404,8 @@ public class ReplicateEvents {
                         .withHints(Hints.create()
                                 .withWriteShards(20))
                         .withWriterConfig(WriterConfig.create()
-                                .withAppIdentifier(appIdentifier)));
+                                .withAppIdentifier(appIdentifier)
+                                .withUpsertMode(UpsertMode.REPLACE)));
 
         return p.run();
     }
