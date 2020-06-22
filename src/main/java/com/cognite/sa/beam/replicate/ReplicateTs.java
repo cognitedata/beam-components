@@ -508,7 +508,8 @@ public class ReplicateTs {
                         .withHints(Hints.create()
                                 .withWriteShards(20))
                         .withWriterConfig(WriterConfig.create()
-                                .withAppIdentifier(appIdentifier)));
+                                .withAppIdentifier(appIdentifier)
+                                .withUpsertMode(UpsertMode.REPLACE)));
 
         /*
          Read ts points for all headers.
