@@ -431,21 +431,21 @@ public class ReplicateTs {
                     public void processElement(@Element TimeseriesMetadata input,
                                                OutputReceiver<TimeseriesMetadata> out,
                                                ProcessContext context) {
-                        List<String> blacklist = context.sideInput(tsDenyList);
-                        List<String> whitelist = context.sideInput(tsAllowList);
-                        List<String> blacklistRegEx = context.sideInput(tsDenyListRegEx);
-                        List<String> whitelistRegEx = context.sideInput(tsAllowListRegEx);
+                        List<String> denyList = context.sideInput(tsDenyList);
+                        List<String> allowList = context.sideInput(tsAllowList);
+                        List<String> denyListRegEx = context.sideInput(tsDenyListRegEx);
+                        List<String> allowListRegEx = context.sideInput(tsAllowListRegEx);
 
                         // Check for blacklist match
-                        if (!blacklist.isEmpty() && input.hasExternalId()) {
-                            if (blacklist.contains(input.getExternalId().getValue())) {
+                        if (!denyList.isEmpty() && input.hasExternalId()) {
+                            if (denyList.contains(input.getExternalId().getValue())) {
                                 LOG.debug("Deny list match {}. TS will be dropped.", input.getExternalId().getValue());
                                 return;
                             }
                         }
 
-                        if (!blacklistRegEx.isEmpty() && input.hasExternalId()) {
-                            for (String regExString : blacklistRegEx) {
+                        if (!denyListRegEx.isEmpty() && input.hasExternalId()) {
+                            for (String regExString : denyListRegEx) {
                                 if (Pattern.matches(regExString, input.getExternalId().getValue())) {
                                     LOG.debug("Deny list regEx {} match externalId {}. TS will be dropped.",
                                             regExString,
@@ -455,20 +455,20 @@ public class ReplicateTs {
                             }
                         }
 
-                        // Check for whitelist match
-                        if (whitelist.contains("*")) {
+                        // Check for allow list match
+                        if (allowList.contains("*")) {
                             out.output(input);
                             return;
                         }
 
-                        if (whitelist.contains(input.getExternalId().getValue())) {
+                        if (allowList.contains(input.getExternalId().getValue())) {
                             LOG.debug("Allow list match {}. TS will be included.", input.getExternalId().getValue());
                             out.output(input);
                             return;
                         }
 
-                        if (!whitelistRegEx.isEmpty() && input.hasExternalId()) {
-                            for (String regExString : whitelistRegEx) {
+                        if (!allowListRegEx.isEmpty() && input.hasExternalId()) {
+                            for (String regExString : allowListRegEx) {
                                 if (Pattern.matches(regExString, input.getExternalId().getValue())) {
                                     LOG.debug("Allow list regEx {} match externalId {}. TS will be included.",
                                             regExString,
