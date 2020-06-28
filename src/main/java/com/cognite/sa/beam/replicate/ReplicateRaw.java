@@ -202,7 +202,7 @@ public class ReplicateRaw {
                                         .withRootParameter("limit", 2000)
                         ))
                 .apply("Read cdf raw rows", CogniteIO.readAllRawRow()
-                        .withProjectConfig(targetConfig)
+                        .withProjectConfig(sourceConfig)
                         .withHints(Hints.create()
                                 .withReadShards(4))
                         .withReaderConfig(ReaderConfig.create()
