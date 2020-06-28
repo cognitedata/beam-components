@@ -436,7 +436,7 @@ public class ReplicateTs {
                         List<String> denyListRegEx = context.sideInput(tsDenyListRegEx);
                         List<String> allowListRegEx = context.sideInput(tsAllowListRegEx);
 
-                        // Check for blacklist match
+                        // Check for deny list match
                         if (!denyList.isEmpty() && input.hasExternalId()) {
                             if (denyList.contains(input.getExternalId().getValue())) {
                                 LOG.debug("Deny list match {}. TS will be dropped.", input.getExternalId().getValue());
