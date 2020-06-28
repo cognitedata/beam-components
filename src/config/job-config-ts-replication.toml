@@ -11,8 +11,8 @@ enableDataSetMapping = "yes"    # yes/no, try mapping the source data set to tar
 # The regEx expression must be entered as a Java String. I.e. double escape characters.
 # Example: "\\d" for digit, "\\\\" for backslash.
 [denyList]
-tsExternalIdRegEx = []      # leave empty for no blacklist
-tsExternalId = []           # no blacklisting
+tsExternalIdRegEx = []      # leave empty for no deny list
+tsExternalId = []           # leave empty for no deny list
 [allowList]
 dataSetExternalId = ["*"]           # "*" includes all data sets
 tsExternalIdRegEx = []      # leave empty for no whitelist
