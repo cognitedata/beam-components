@@ -35,7 +35,7 @@
 #---------------------------------------------------------------------
 $jobConfigFile = 'gs://' + $gcpBucketPrefix + '-test/config/replicate/job-config-raw-replication.toml'
 
-mvn compile exec:java -D exec.mainClass=com.cognite.sa.beam.replicate.ReplicateRaw -D exec.args="--cdfInputSecret=$cdfInputSecret --cdfInputHost=$cdfInputHost --cdfOutputSecret=$cdfOutputSecret --cdfOutputHost=$cdfOutputHost --jobConfigFile=$jobConfigFile --project=$gcpProject --runner=DataFlowRunner --gcpTempLocation=gs://$gcpBucketPrefix-test/temp --stagingLocation=gs://$gcpBucketPrefix-test/stage/replicate-raw --region=europe-west1 --experiments=shuffle_mode=service --numWorkers=2 --maxNumWorkers=6 --experiments=enable_stackdriver_agent_metrics --workerMachineType=n1-standard-2"
+mvn compile exec:java -D exec.mainClass=com.cognite.sa.beam.replicate.ReplicateRaw -D exec.args="--cdfInputSecret=$cdfInputSecret --cdfInputHost=$cdfInputHost --cdfOutputSecret=$cdfOutputSecret --cdfOutputHost=$cdfOutputHost --jobConfigFile=$jobConfigFile --project=$gcpProject --runner=DataFlowRunner --gcpTempLocation=gs://$gcpBucketPrefix-test/temp --stagingLocation=gs://$gcpBucketPrefix-test/stage/replicate-raw --region=europe-west1 --experiments=shuffle_mode=service --numWorkers=2 --maxNumWorkers=6 --experiments=enable_stackdriver_agent_metrics --workerMachineType=e2-standard-2"
 
 # In order to add profiling:
 # --profilingAgentConfiguration='{\""APICurated\"" : true}'

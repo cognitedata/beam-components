@@ -23,6 +23,7 @@ import com.cognite.beam.io.dto.RawTable;
 import com.cognite.beam.io.servicesV1.RequestParameters;
 import com.cognite.beam.io.transform.BreakFusion;
 import com.cognite.beam.io.transform.toml.ReadTomlFile;
+import com.cognite.beam.io.transform.toml.ReadTomlStringArray;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.options.*;
@@ -30,6 +31,7 @@ import org.apache.beam.sdk.transforms.*;
 import org.apache.beam.sdk.values.PCollection;
 import org.apache.beam.sdk.values.PCollectionView;
 import org.apache.beam.sdk.values.TypeDescriptor;
+import org.apache.beam.sdk.values.TypeDescriptors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tomlj.*;
@@ -37,10 +39,7 @@ import org.tomlj.*;
 import java.util.ArrayList;
 import java.util.List;
 /**
- * This pipeline reads all raw tables from the specified cdp instance and writes them to a target BigQuery table.
- *
- * The job is designed as a batch job which will trucate and write to BQ. That is, it will do a full update
- * with each execution.
+ * This pipeline reads raw tables from the specified cdp instance and writes them to a target CDF instance.
  *
  * This job is prepared to be deployed as a template on GCP (Dataflow) + can be executed directly on any runner.
  */
@@ -49,63 +48,42 @@ public class ReplicateRaw {
     private static final Logger LOG = LoggerFactory.getLogger(ReplicateRaw.class);
     private static final String appIdentifier = "Replicate_Raw";
 
-    /**
-     * Parses the toml configuration entry and extracts the dbNames whitelist entry.
-     */
-    private static class ParseDbNameAllowListFn extends DoFn<String, List<String>> {
-        @ProcessElement
-        public void processElement(@Element String tomlString,
-                                   OutputReceiver<List<String>> outputReceiver) throws Exception {
-            List<String> outputList = new ArrayList<>(20);
-            LOG.debug("Received TOML string. Size: {}", tomlString.length());
-            LOG.debug("Parsing TOML string");
-            TomlParseResult parseResult = Toml.parse(tomlString);
-            LOG.debug("Finish parsing toml string");
-
-            if (!parseResult.isArray("allowList.dbName")) {
-                LOG.warn("dbName is not defined as an array: {}", parseResult.toString());
-            }
-
-            TomlArray dbNameArray = parseResult.getArrayOrEmpty("allowList.dbName");
-            if (dbNameArray.isEmpty()) {
-                LOG.warn("Cannot find a dbName array under the allow list section: {}", parseResult.toString());
-                outputReceiver.output(outputList);
-                return;
-            }
-
-            if (dbNameArray.containsStrings()) {
-                for (int i = 0; i < dbNameArray.size(); i++) {
-                    outputList.add(dbNameArray.getString(i));
-                }
-                outputReceiver.output(outputList);
-            } else {
-                LOG.warn("dbName config entry does not contain string values: {}", dbNameArray.toString());
-                outputReceiver.output(outputList);
-            }
-        }
-    }
 
     /**
      * Filters the main input (String) based on the side input (List<String>)
      */
     private static class FilterInputFn extends DoFn<String, String> {
-        private final PCollectionView<List<String>> stringListView;
+        private final PCollectionView<List<String>> allowListView;
+        private final PCollectionView<List<String>> denyListView;
 
-        FilterInputFn(PCollectionView<List<String>> pCollectionView) {
-            stringListView = pCollectionView;
+        FilterInputFn(PCollectionView<List<String>> allowListView,
+                      PCollectionView<List<String>> denyListView) {
+            this.allowListView = allowListView;
+            this.denyListView = denyListView;
         }
 
         @ProcessElement
         public void processElement(@Element String input,
                                    OutputReceiver<String> outputReceiver,
                                    ProcessContext context) {
-            List<String> whitelist = context.sideInput(stringListView);
-            if (whitelist.contains("*")) {
+            List<String> allowList = context.sideInput(allowListView);
+            List<String> denyList = context.sideInput(denyListView);
+
+            // check against deny list entries
+            if (!denyList.isEmpty()) {
+                if (denyList.contains(input)) {
+                    LOG.debug("Deny list match. DB {} will be skipped.", input);
+                    return;
+                }
+            }
+
+            if (allowList.contains("*")) {
                 // no filter
                 outputReceiver.output(input);
                 return;
             }
-            if (whitelist.contains(input)) {
+            if (allowList.contains(input)) {
+                LOG.debug("Allow list match. DB {} will be included.", input);
                 outputReceiver.output(input);
             }
         }
@@ -178,15 +156,26 @@ public class ReplicateRaw {
 
         Pipeline p = Pipeline.create(options);
 
-        // Read the job config file
-        PCollection<String> jobConfig = p
-                .apply("Read job config file", ReadTomlFile.from(options.getJobConfigFile()))
-                .apply("Remove key", Values.create());
+        // Parse dbName allow and deny lists to side input
+        PCollectionView<List<String>> denyListDbName = p
+                .apply("Read dbName allow list", ReadTomlStringArray.from(options.getJobConfigFile())
+                        .withArrayKey("denyList.dbNames"))
+                .apply("Log dbName deny", MapElements.into(TypeDescriptors.strings())
+                        .via(expression -> {
+                            LOG.info("Registered db name: {}", expression);
+                            return expression;
+                        }))
+                .apply("To view", View.asList());
 
-        // Parse dbName whitelist to side input
-        PCollectionView<List<String>> dbNameWhitelistView = jobConfig
-                .apply("Extract dbName allow list", ParDo.of(new ParseDbNameAllowListFn()))
-                .apply("To singleton view", View.asSingleton());
+        PCollectionView<List<String>> allowListDbName = p
+                .apply("Read dbName allow list", ReadTomlStringArray.from(options.getJobConfigFile())
+                        .withArrayKey("allowList.dbNames"))
+                .apply("Log dbName allow", MapElements.into(TypeDescriptors.strings())
+                        .via(expression -> {
+                            LOG.info("Registered db name: {}", expression);
+                            return expression;
+                        }))
+                .apply("To view", View.asList());
 
         // Read all raw db and table names.
         PCollection<RawTable> rawTables = p
@@ -194,8 +183,8 @@ public class ReplicateRaw {
                         .withProjectConfig(sourceConfig)
                         .withReaderConfig(ReaderConfig.create()
                                 .withAppIdentifier(appIdentifier)))
-                .apply("Filter db names", ParDo.of(new FilterInputFn(dbNameWhitelistView))
-                        .withSideInputs(dbNameWhitelistView))
+                .apply("Filter db names", ParDo.of(new FilterInputFn(allowListDbName, denyListDbName))
+                        .withSideInputs(allowListDbName, denyListDbName))
                 .apply("Read raw table names", CogniteIO.readAllRawTable()
                         .withProjectConfig(sourceConfig)
                         .withReaderConfig(ReaderConfig.create()
@@ -210,10 +199,10 @@ public class ReplicateRaw {
                                 RequestParameters.create()
                                         .withDbName(input.getDbName())
                                         .withTableName(input.getTableName())
-                                        .withRootParameter("limit", 5000)
+                                        .withRootParameter("limit", 2000)
                         ))
                 .apply("Read cdf raw rows", CogniteIO.readAllRawRow()
-                        .withProjectConfig(targetConfig)
+                        .withProjectConfig(sourceConfig)
                         .withHints(Hints.create()
                                 .withReadShards(4))
                         .withReaderConfig(ReaderConfig.create()

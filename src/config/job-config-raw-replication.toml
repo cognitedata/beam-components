@@ -1,2 +1,4 @@
 [allowList]
-dbName = ["proarc"]
+dbNames = ["*"]     # "*" includes all DBs
+[denyList]
+dbNames=[]          # leave empty for no deny list
