@@ -30,12 +30,18 @@
 #$cdfInputHost = 'https://api.cognitedata.com'
 #$cdfOutputHost = 'https://api.cognitedata.com'
 
+#--------------------------------------------------------------------
+# Delta read control. Setting fullRead to 'true' will enforce a full read
+# of the source.
+#--------------------------------------------------------------------
+#$fullRead = 'true'
+
 #---------------------------------------------------------------------
 # The job config file.
 #---------------------------------------------------------------------
 $jobConfigFile = 'gs://' + $gcpBucketPrefix + '-test/config/replicate/job-config-events-replication.toml'
 
-mvn compile exec:java -D exec.mainClass=com.cognite.sa.beam.replicate.ReplicateEvents -D exec.args="--cdfInputSecret=$cdfInputSecret --cdfInputHost=$cdfInputHost --cdfOutputSecret=$cdfOutputSecret --cdfOutputHost=$cdfOutputHost --jobConfigFile=$jobConfigFile --project=$gcpProject --runner=DataFlowRunner --gcpTempLocation=gs://$gcpBucketPrefix-test/temp --stagingLocation=gs://$gcpBucketPrefix-test/stage/replicate/replicate-events --region=europe-west1 --experiments=shuffle_mode=service --numWorkers=10 --maxNumWorkers=20 --experiments=enable_stackdriver_agent_metrics --workerMachineType=e2-standard-2"
+mvn compile exec:java -D exec.mainClass=com.cognite.sa.beam.replicate.ReplicateEvents -D exec.args="--cdfInputSecret=$cdfInputSecret --cdfInputHost=$cdfInputHost --cdfOutputSecret=$cdfOutputSecret --cdfOutputHost=$cdfOutputHost --jobConfigFile=$jobConfigFile --fullRead=$fullRead --project=$gcpProject --runner=DataFlowRunner --gcpTempLocation=gs://$gcpBucketPrefix-test/temp --stagingLocation=gs://$gcpBucketPrefix-test/stage/replicate/replicate-events --region=europe-west1 --experiments=shuffle_mode=service --numWorkers=10 --maxNumWorkers=20 --experiments=enable_stackdriver_agent_metrics --workerMachineType=e2-standard-2"
 
 # In order to add profiling:
 # --profilingAgentConfiguration='{\""APICurated\"" : true}'
