@@ -138,21 +138,7 @@ public class ReplicateEvents {
                 }
             }
 
-            // Check for constraint violations and correct
-            if (!builder.hasStartTime()) {
-                builder.setStartTime(Int64Value.of(0L));
-                String message = "startTime was not set. Setting startTime to 0L.";
-                builder.putMetadata("constraintViolationStartTime_a", message);
-                LOG.warn(message + " Event externalId: {}", builder.getExternalId().getValue());
-            }
-
-            if (!builder.hasEndTime()) {
-                builder.setEndTime(Int64Value.of(builder.getStartTime().getValue()));
-                String message = "endTime was not set. Set endTime to be equal to startTime";
-                builder.putMetadata("constraintViolationEndTime_a", message);
-                LOG.warn(message + " Event externalId: {}", builder.getExternalId().getValue());
-            }
-
+            // Check for constraint violations and correct the data
             if (builder.getStartTime().getValue() < 0) {
                 builder.setStartTime(Int64Value.of(0L));
                 String message = "startTime was < 0. Setting startTime to 0L.";
@@ -167,7 +153,8 @@ public class ReplicateEvents {
                 LOG.warn(message + " Event externalId: {}", builder.getExternalId().getValue());
             }
 
-            if (builder.getStartTime().getValue() > builder.getEndTime().getValue()) {
+            if (builder.hasEndTime() && builder.hasStartTime()
+                        && builder.getStartTime().getValue() > builder.getEndTime().getValue()) {
                 builder.setStartTime(Int64Value.of(builder.getEndTime().getValue()));
                 String message = "startTime was greater than endTime. Changed startTime to be equal to endTime.";
                 builder.putMetadata("constraintViolationStartTime_b", message);
