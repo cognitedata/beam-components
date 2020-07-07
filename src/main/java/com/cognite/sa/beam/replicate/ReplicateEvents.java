@@ -39,6 +39,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -227,6 +228,16 @@ public class ReplicateEvents {
         @Validation.Required
         ValueProvider<String> getJobConfigFile();
         void setJobConfigFile(ValueProvider<String> value);
+
+        /**
+         * Specify delta read override.
+         *
+         * Set to {@code true} for full reads.
+         */
+        @Description("Full read flag. Set to true for full read, false for delta read.")
+        @Default.Boolean(false)
+        ValueProvider<Boolean> getFullRead();
+        void setFullRead(ValueProvider<Boolean> value);
     }
 
     /**
@@ -394,7 +405,10 @@ public class ReplicateEvents {
                         .withHints(Hints.create()
                                 .withReadShards(1000))
                         .withReaderConfig(ReaderConfig.create()
-                                .withAppIdentifier(appIdentifier)))
+                                .withAppIdentifier(appIdentifier)
+                                .enableDeltaRead("system.replicator-delta-timestamp")
+                                .withDeltaOffset(Duration.ofHours(2))
+                                .withFullReadOverride(options.getFullRead())))
                 .apply("Process events", ParDo.of(new PrepareEvents(configMap, sourceAssetsIdMap,
                         targetAssetsIdMap, sourceDataSetsIdMap, targetDataSetsExtIdMap))
                         .withSideInputs(configMap, sourceAssetsIdMap, targetAssetsIdMap,
