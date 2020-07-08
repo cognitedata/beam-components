@@ -377,12 +377,17 @@ public class ReplicateEvents {
                             datasetExternalIds.add(ImmutableMap.of("externalId", extId));
                         }
 
+                        // Add filter for max lastUpdatedTime
+                        RequestParameters req = input
+                                .withFilterParameter("lastUpdatedTime", ImmutableMap.of(
+                                        "max", System.currentTimeMillis()));
+
                         if (datasetExternalIds.isEmpty() || allowList.contains("*")) {
                             LOG.info("Will not filter on data set external id");
-                            out.output(input);
+                            out.output(req);
                         } else {
                             LOG.info("Add filter on {} data set external ids.", datasetExternalIds.size());
-                            out.output(input
+                            out.output(req
                                     .withFilterParameter("dataSetIds", datasetExternalIds));
                         }
                     }
@@ -394,6 +399,7 @@ public class ReplicateEvents {
                         .withReaderConfig(ReaderConfig.create()
                                 .withAppIdentifier(appIdentifier)
                                 .enableDeltaRead("system.replicator-delta-timestamp")
+                                .withDeltaIdentifier("event-replicator")
                                 .withDeltaOffset(Duration.ofHours(2))
                                 .withFullReadOverride(options.getFullRead())))
                 .apply("Process events", ParDo.of(new PrepareEvents(configMap, sourceAssetsIdMap,
