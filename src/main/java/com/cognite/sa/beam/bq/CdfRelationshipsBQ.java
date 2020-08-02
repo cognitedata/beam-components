@@ -22,6 +22,7 @@ import com.cognite.beam.io.config.GcpSecretConfig;
 import com.cognite.beam.io.config.ProjectConfig;
 import com.cognite.beam.io.config.ReaderConfig;
 import com.cognite.beam.io.dto.Relationship;
+import com.cognite.beam.io.servicesV1.parser.RelationshipParser;
 import com.google.api.services.bigquery.model.TableFieldSchema;
 import com.google.api.services.bigquery.model.TableRow;
 import com.google.api.services.bigquery.model.TableSchema;
@@ -40,7 +41,7 @@ import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 
 /**
- * This pipeline reads all relationships from the specified cdp instance and writes them to a target BigQuery table.
+ * This pipeline reads all relationships from the specified cdf instance and writes them to a target BigQuery table.
  *
  * The job is designed as a batch job which will truncate and write to BQ. It has built in delta read support
  * and can be configured (via a parameter) to do delta or full read.
@@ -68,27 +69,6 @@ public class CdfRelationshipsBQ {
             new TableFieldSchema().setName("last_updated_time").setType("TIMESTAMP"),
             new TableFieldSchema().setName("row_updated_time").setType("TIMESTAMP")
     ));
-
-    /* Temporary maps. Can be removed when the Beam connector 0.9.4 is released. */
-    private static final ImmutableBiMap<String, Relationship.Reference.ResourceType> resourceTypeMap = ImmutableBiMap
-            .<String, Relationship.Reference.ResourceType>builder()
-            .put("asset", Relationship.Reference.ResourceType.ASSET)
-            .put("timeSeries", Relationship.Reference.ResourceType.TIME_SERIES)
-            .put("file", Relationship.Reference.ResourceType.FILE)
-            .put("threeD", Relationship.Reference.ResourceType.THREE_D)
-            .put("threeDRevision", Relationship.Reference.ResourceType.THREE_D_REVISION)
-            .put("event", Relationship.Reference.ResourceType.EVENT)
-            .put("sequence", Relationship.Reference.ResourceType.SEQUENCE)
-            .build();
-
-    private static final ImmutableBiMap<String, Relationship.RelationshipType> relationshipTypeMap = ImmutableBiMap
-            .<String, Relationship.RelationshipType>builder()
-            .put("flowsTo", Relationship.RelationshipType.FLOWS_TO)
-            .put("belongsTo", Relationship.RelationshipType.BELONGS_TO)
-            .put("isParentOf", Relationship.RelationshipType.IS_PARENT_OF)
-            .put("implements", Relationship.RelationshipType.IMPLEMENTS)
-            .build();
-
 
     /**
      * Custom options for this pipeline.
@@ -186,16 +166,16 @@ public class CdfRelationshipsBQ {
                             .set("source_external_id", element.hasSource() ?
                                     element.getSource().getResourceExternalId() : null)
                             .set("source_type", element.hasSource() ?
-                                    resourceTypeMap.inverse().get(element.getSource().getResourceType()) : null)
+                                    RelationshipParser.toString(element.getSource().getResourceType()) : null)
                             .set("target_external_id", element.hasTarget() ?
                                     element.getTarget().getResourceExternalId() : null)
                             .set("target_type", element.hasTarget() ?
-                                    resourceTypeMap.inverse().get(element.getTarget().getResourceType()) : null)
+                                    RelationshipParser.toString(element.getTarget().getResourceType()) : null)
                             .set("start_time", element.hasStartTime() ? formatter.format(Instant.ofEpochMilli(element.getStartTime().getValue())) : null)
                             .set("end_time", element.hasEndTime() ? formatter.format(Instant.ofEpochMilli(element.getEndTime().getValue())) : null)
                             .set("confidence", element.getConfidence())
                             .set("data_set", element.getDataSet())
-                            .set("relationship_type", relationshipTypeMap.inverse().get(element.getRelationshipType()))
+                            .set("relationship_type", RelationshipParser.toString(element.getRelationshipType()))
                             .set("created_time", element.hasCreatedTime() ? formatter.format(Instant.ofEpochMilli(element.getCreatedTime().getValue())) : null)
                             .set("last_updated_time", element.hasLastUpdatedTime() ? formatter.format(Instant.ofEpochMilli(element.getLastUpdatedTime().getValue())) : null)
                             .set("row_updated_time", formatter.format(Instant.now()));
