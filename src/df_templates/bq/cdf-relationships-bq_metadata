@@ -1,6 +1,6 @@
 {
-  "name": "CDF TS points to BQ",
-  "description": "Extracts TS points from CDF and publishes them to BQ.",
+  "name": "CDF Relationships to BQ",
+  "description": "Extracts relationships from CDF and publishes them to BQ.",
   "parameters": [{
                      "name": "cdfInputSecret",
                      "label": "CDF source api key--Secret Manager reference",
@@ -13,6 +13,12 @@
                       "help_text": "CDF api host. ex: https://api.cognitedata.com",
                       "is_optional": true
                     },
+  {
+        "name": "fullRead",
+        "label": "Full read override.",
+        "help_text": "Set to true for full read. Set to false for delta read. Default is false.",
+        "is_optional": false
+      },
   {
     "name": "outputMainTable",
     "label": "Output table in BQ",

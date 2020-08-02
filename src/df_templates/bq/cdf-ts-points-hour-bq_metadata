@@ -2,11 +2,17 @@
   "name": "CDF TS points hourly aggregates to BQ",
   "description": "Extracts TS points hourly aggregates from CDF and publishes them to BQ.",
   "parameters": [{
-    "name": "cdfConfigFile",
-    "label": "CDF project configuration file",
-    "help_text": "CDF project configuration file. ex: gs://MyBucket/config.toml",
-    "is_optional": false
-  },
+                     "name": "cdfInputSecret",
+                     "label": "CDF source api key--Secret Manager reference",
+                     "help_text": "CDF source api key--Secret Manager reference. ex: <gcp-project-id>.<secret-id>",
+                     "is_optional": false
+                   },
+                    {
+                      "name": "cdfInputHost",
+                      "label": "CDF api host",
+                      "help_text": "CDF api host. ex: https://api.cognitedata.com",
+                      "is_optional": true
+                    },
   {
     "name": "outputMainTable",
     "label": "Output table in BQ",
