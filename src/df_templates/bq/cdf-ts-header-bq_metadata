@@ -2,17 +2,17 @@
   "name": "CDF TS header to BQ",
   "description": "Extracts TS header from CDF and publishes them to BQ.",
   "parameters": [{
-                     "name": "cdfInputSecret",
-                     "label": "CDF source api key--Secret Manager reference",
-                     "help_text": "CDF source api key--Secret Manager reference. ex: <gcp-project-id>.<secret-id>",
-                     "is_optional": false
-                   },
-                    {
-                      "name": "cdfInputHost",
-                      "label": "CDF api host",
-                      "help_text": "CDF api host. ex: https://api.cognitedata.com",
-                      "is_optional": true
-                    },
+      "name": "cdfSecret",
+      "label": "CDF source api key--Secret Manager reference",
+      "help_text": "CDF source api key--Secret Manager reference. ex: <gcp-project-id>.<secret-id>",
+      "is_optional": false
+    },
+     {
+       "name": "cdfHost",
+       "label": "CDF api host",
+       "help_text": "CDF api host. ex: https://api.cognitedata.com",
+       "is_optional": true
+     },
   {
         "name": "fullRead",
         "label": "Full read override.",
