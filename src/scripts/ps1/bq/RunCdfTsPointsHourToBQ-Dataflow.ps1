@@ -34,6 +34,6 @@ $outputMainTable = $outputDataSet + '.cdf_ts_point_hour'
 #$bqTempStorage = 'gs://beam-component/temp'
 
 # Full read. Set to _true_ for full read, _false_ for delta read
-$fullRead = 'true'
+#$fullRead = 'true'
 
-mvn compile exec:java -D exec.mainClass=com.cognite.sa.beam.bq.CdfTsPointsHourBQ -D exec.args="--cdfSecret=$cdfSecret --cdfHost=$cdfHost --bqTempStorage=$bqTempStorage --outputMainTable=$outputMainTable --fullRead=$fullRead --project=$gcpProject --runner=DataFlowRunner --gcpTempLocation=gs://$gcpBucketPrefix-test//temp --stagingLocation=gs://$gcpBucketPrefix-test/stage/cdf-ts-points-hour-bq --region=europe-west1 --experiments=shuffle_mode=service --numWorkers=15 --maxNumWorkers=15 --experiments=enable_stackdriver_agent_metrics"
+mvn compile exec:java -D exec.mainClass=com.cognite.sa.beam.bq.CdfTsPointsHourBQ -D exec.args="--cdfSecret=$cdfSecret --cdfHost=$cdfHost --bqTempStorage=$bqTempStorage --outputMainTable=$outputMainTable --fullRead=$fullRead --project=$gcpProject --runner=DataFlowRunner --gcpTempLocation=gs://$gcpBucketPrefix-test//temp --stagingLocation=gs://$gcpBucketPrefix-test/stage/cdf-ts-points-hour-bq --region=europe-west1 --experiments=shuffle_mode=service --numWorkers=15 --maxNumWorkers=15 --experiments=enable_stackdriver_agent_metrics --workerMachineType=e2-standard-2"
