@@ -26,11 +26,15 @@ import com.cognite.beam.io.dto.Event;
 import com.google.api.services.bigquery.model.TableFieldSchema;
 import com.google.api.services.bigquery.model.TableRow;
 import com.google.api.services.bigquery.model.TableSchema;
+import com.google.protobuf.Int64Value;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO;
 import org.apache.beam.sdk.options.*;
+import org.apache.beam.sdk.transforms.MapElements;
+import org.apache.beam.sdk.transforms.ParDo;
 import org.apache.beam.sdk.values.PCollection;
+import org.apache.beam.sdk.values.TypeDescriptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,6 +58,9 @@ public class CdfEventsBQ {
     // The log to output status messages to.
     private static final Logger LOG = LoggerFactory.getLogger(CdfEventsBQ.class);
     private static final String appIdentifier = "CdfEventsBQ";
+
+    /* Useful constants */
+    private static final Instant maxTimestamp = Instant.parse("9999-12-31T23:59:59.99Z");
 
     /* BQ output schema */
     private static final TableSchema eventSchemaBQ = new TableSchema().setFields(ImmutableList.of(
@@ -152,17 +159,34 @@ public class CdfEventsBQ {
         Pipeline p = Pipeline.create(options);
 
         // Read and parse the main input.
-        PCollection<Event> mainInput = p.apply("Read cdf events", CogniteIO.readEvents()
-                .withProjectConfig(projectConfig)
-                .withHints(Hints.create()
-                        .withReadShards(1000))
-                .withReaderConfig(ReaderConfig.create()
-                        .withAppIdentifier(appIdentifier)
-                        .enableDeltaRead("system.bq-delta")
-                        .withDeltaIdentifier("events")
-                        .withDeltaOffset(Duration.ofMinutes(10))
-                        .withFullReadOverride(options.getFullRead()))
-        );
+        PCollection<Event> mainInput = p
+                .apply("Read cdf events", CogniteIO.readEvents()
+                        .withProjectConfig(projectConfig)
+                        .withHints(Hints.create()
+                                .withReadShards(1000))
+                        .withReaderConfig(ReaderConfig.create()
+                                .withAppIdentifier(appIdentifier)
+                                .enableDeltaRead("system.bq-delta")
+                                .withDeltaIdentifier("events")
+                                .withDeltaOffset(Duration.ofMinutes(10))
+                                .withFullReadOverride(options.getFullRead())))
+                .apply("Check constraints", MapElements.into(TypeDescriptor.of(Event.class))
+                        .via((Event event) -> {
+                            Event.Builder eventBuilder = event.toBuilder();
+
+                            // Check against the max allowed timestamp in BQ
+                            if (eventBuilder.hasEndTime()
+                                    && eventBuilder.getEndTime().getValue() > maxTimestamp.toEpochMilli()) {
+                                LOG.warn("Event has [endTime] with too large value--will be reset to the max allowed."
+                                        + " Event externalId: {}, original endTime: {}, description: {}",
+                                        eventBuilder.getExternalId().getValue(),
+                                        eventBuilder.getEndTime().getValue(),
+                                        eventBuilder.getDescription().getValue());
+                                eventBuilder.setEndTime(Int64Value.of(maxTimestamp.toEpochMilli()));
+                            }
+
+                            return eventBuilder.build();
+                        }));
 
         // Write to BQ
         mainInput.apply("Write output to BQ", BigQueryIO.<Event>write()
