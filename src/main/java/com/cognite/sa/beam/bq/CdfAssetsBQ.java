@@ -23,6 +23,7 @@ import com.cognite.beam.io.config.Hints;
 import com.cognite.beam.io.config.ProjectConfig;
 import com.cognite.beam.io.config.ReaderConfig;
 import com.cognite.beam.io.dto.Asset;
+import com.cognite.beam.io.servicesV1.RequestParameters;
 import com.google.api.services.bigquery.model.TableFieldSchema;
 
 import com.google.api.services.bigquery.model.TableRow;
@@ -65,15 +66,20 @@ public class CdfAssetsBQ {
             new TableFieldSchema().setName("external_id").setType("STRING"),
             new TableFieldSchema().setName("name").setType("STRING"),
             new TableFieldSchema().setName("parent_id").setType("INT64"),
+            new TableFieldSchema().setName("parent_external_id").setType("STRING"),
             new TableFieldSchema().setName("description").setType("STRING"),
             new TableFieldSchema().setName("root_id").setType("INT64"),
             new TableFieldSchema().setName("source").setType("STRING"),
             new TableFieldSchema().setName("created_time").setType("TIMESTAMP"),
             new TableFieldSchema().setName("last_updated_time").setType("TIMESTAMP"),
+            new TableFieldSchema().setName("data_set_id").setType("INT64"),
             new TableFieldSchema().setName("metadata").setType("RECORD").setMode("REPEATED").setFields(ImmutableList.of(
                     new TableFieldSchema().setName("key").setType("STRING"),
                     new TableFieldSchema().setName("value").setType("STRING")
             )),
+            new TableFieldSchema().setName("child_count").setType("INT64"),
+            new TableFieldSchema().setName("depth").setType("INT64"),
+            new TableFieldSchema().setName("path").setType("INT64").setMode("REPEATED"),
             new TableFieldSchema().setName("row_updated_time").setType("TIMESTAMP")
     ));
 
@@ -154,6 +160,10 @@ public class CdfAssetsBQ {
         // Read and parse the main input.
         PCollection<Asset> mainInput = p.apply("Read cdf assets", CogniteIO.readAssets()
                 .withProjectConfig(projectConfig)
+                .withRequestParameters(RequestParameters.create()
+                        .withRootParameter("aggregatedProperties", ImmutableList.of(
+                                "childCount", "path", "depth"
+                        )))
                 .withHints(Hints.create()
                         .withReadShards(100))
                 .withReaderConfig(ReaderConfig.create()
@@ -170,6 +180,7 @@ public class CdfAssetsBQ {
                 .withSchema(assetSchemaBQ)
                 .withFormatFunction((Asset element) -> {
                     List<TableRow> metadata = new ArrayList<>();
+                    List<Long> path = new ArrayList<>();
                     DateTimeFormatter formatter = DateTimeFormatter.ISO_INSTANT;
 
                     for (Map.Entry<String, String> mElement : element.getMetadataMap().entrySet()) {
@@ -178,17 +189,28 @@ public class CdfAssetsBQ {
                                 .set("value", mElement.getValue()));
                     }
 
+                    if (element.hasAggregates()) {
+                        path = element.getAggregates().getPathList();
+                    }
+
                     return new TableRow()
                             .set("id", element.hasId() ? element.getId().getValue() : null)
                             .set("external_id", element.hasExternalId() ? element.getExternalId().getValue() : null)
                             .set("name", element.getName())
                             .set("parent_id", element.hasParentId() ? element.getParentId().getValue() : null)
+                            .set("parent_external_id", element.hasParentExternalId() ? element.getParentExternalId().getValue() : null)
                             .set("description", element.hasDescription() ? element.getDescription().getValue() : null)
                             .set("root_id", element.hasRootId() ? element.getRootId().getValue() : null)
                             .set("source", element.hasSource() ? element.getSource().getValue() : null)
                             .set("created_time", element.hasCreatedTime() ? formatter.format(Instant.ofEpochMilli(element.getCreatedTime().getValue())) : null)
                             .set("last_updated_time", element.hasLastUpdatedTime() ? formatter.format(Instant.ofEpochMilli(element.getLastUpdatedTime().getValue())) : null)
+                            .set("data_set_id", element.hasDataSetId() ? element.getDataSetId().getValue() : null)
                             .set("metadata", metadata)
+                            .set("child_count", element.hasAggregates() && element.getAggregates().hasChildCount() ?
+                                    element.getAggregates().getChildCount().getValue() : null)
+                            .set("depth", element.hasAggregates() && element.getAggregates().hasDepth() ?
+                                    element.getAggregates().getDepth().getValue() : null)
+                            .set("path", path)
                             .set("row_updated_time", formatter.format(Instant.now()));
                 })
                 .withCreateDisposition(BigQueryIO.Write.CreateDisposition.CREATE_IF_NEEDED)
