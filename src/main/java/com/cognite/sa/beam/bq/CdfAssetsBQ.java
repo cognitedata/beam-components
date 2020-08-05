@@ -73,6 +73,7 @@ public class CdfAssetsBQ {
             new TableFieldSchema().setName("created_time").setType("TIMESTAMP"),
             new TableFieldSchema().setName("last_updated_time").setType("TIMESTAMP"),
             new TableFieldSchema().setName("data_set_id").setType("INT64"),
+            new TableFieldSchema().setName("labels").setType("STRING").setMode("REPEATED"),
             new TableFieldSchema().setName("metadata").setType("RECORD").setMode("REPEATED").setFields(ImmutableList.of(
                     new TableFieldSchema().setName("key").setType("STRING"),
                     new TableFieldSchema().setName("value").setType("STRING")
@@ -181,6 +182,7 @@ public class CdfAssetsBQ {
                 .withFormatFunction((Asset element) -> {
                     List<TableRow> metadata = new ArrayList<>();
                     List<Long> path = new ArrayList<>();
+                    List<String> labels = element.getLabelsList();
                     DateTimeFormatter formatter = DateTimeFormatter.ISO_INSTANT;
 
                     for (Map.Entry<String, String> mElement : element.getMetadataMap().entrySet()) {
@@ -205,6 +207,7 @@ public class CdfAssetsBQ {
                             .set("created_time", element.hasCreatedTime() ? formatter.format(Instant.ofEpochMilli(element.getCreatedTime().getValue())) : null)
                             .set("last_updated_time", element.hasLastUpdatedTime() ? formatter.format(Instant.ofEpochMilli(element.getLastUpdatedTime().getValue())) : null)
                             .set("data_set_id", element.hasDataSetId() ? element.getDataSetId().getValue() : null)
+                            .set("labels", labels)
                             .set("metadata", metadata)
                             .set("child_count", element.hasAggregates() && element.getAggregates().hasChildCount() ?
                                     element.getAggregates().getChildCount().getValue() : null)
