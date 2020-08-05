@@ -222,8 +222,8 @@ public class CdfRawBQ {
                 })
                 .withCreateDisposition(BigQueryIO.Write.CreateDisposition.CREATE_IF_NEEDED)
                 .withWriteDisposition(BigQueryIO.Write.WriteDisposition.WRITE_TRUNCATE)
-                .withTimePartitioning(new TimePartitioning().setField("last_updated_time"))
-                .withClustering(new Clustering().setFields(ImmutableList.of("db_name", "table_name")))
+                .withTimePartitioning(new TimePartitioning().setField("last_updated_time")) //TODO - remove this one when the BEAM SDK supports clustering without partitioning.
+                .withClustering(new Clustering().setFields(ImmutableList.of("db_name", "table_name", "last_updated_time")))
                 .optimizedWrites()
                 .withCustomGcsTempLocation(options.getBqTempStorage()));
 
