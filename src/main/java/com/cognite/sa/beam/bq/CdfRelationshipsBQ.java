@@ -51,7 +51,7 @@ import java.time.format.DateTimeFormatter;
 public class CdfRelationshipsBQ {
     // The log to output status messages to.
     private static final Logger LOG = LoggerFactory.getLogger(CdfRelationshipsBQ.class);
-    private static final String appIdentifier = "CdfEventsBQ";
+    private static final String appIdentifier = "CdfLabelsBQ";
 
     /* BQ output schema */
     private static final TableSchema relationshipSchemaBQ = new TableSchema().setFields(ImmutableList.of(
@@ -171,13 +171,17 @@ public class CdfRelationshipsBQ {
                                     element.getTarget().getResourceExternalId() : null)
                             .set("target_type", element.hasTarget() ?
                                     RelationshipParser.toString(element.getTarget().getResourceType()) : null)
-                            .set("start_time", element.hasStartTime() ? formatter.format(Instant.ofEpochMilli(element.getStartTime().getValue())) : null)
-                            .set("end_time", element.hasEndTime() ? formatter.format(Instant.ofEpochMilli(element.getEndTime().getValue())) : null)
+                            .set("start_time", element.hasStartTime() ?
+                                    formatter.format(Instant.ofEpochMilli(element.getStartTime().getValue())) : null)
+                            .set("end_time", element.hasEndTime() ?
+                                    formatter.format(Instant.ofEpochMilli(element.getEndTime().getValue())) : null)
                             .set("confidence", element.getConfidence())
                             .set("data_set", element.getDataSet())
                             .set("relationship_type", RelationshipParser.toString(element.getRelationshipType()))
-                            .set("created_time", element.hasCreatedTime() ? formatter.format(Instant.ofEpochMilli(element.getCreatedTime().getValue())) : null)
-                            .set("last_updated_time", element.hasLastUpdatedTime() ? formatter.format(Instant.ofEpochMilli(element.getLastUpdatedTime().getValue())) : null)
+                            .set("created_time", element.hasCreatedTime() ?
+                                    formatter.format(Instant.ofEpochMilli(element.getCreatedTime().getValue())) : null)
+                            .set("last_updated_time", element.hasLastUpdatedTime() ?
+                                    formatter.format(Instant.ofEpochMilli(element.getLastUpdatedTime().getValue())) : null)
                             .set("row_updated_time", formatter.format(Instant.now()));
                 })
                 .withCreateDisposition(BigQueryIO.Write.CreateDisposition.CREATE_IF_NEEDED)
