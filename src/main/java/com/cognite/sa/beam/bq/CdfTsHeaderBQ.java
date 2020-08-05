@@ -65,11 +65,10 @@ public class CdfTsHeaderBQ {
             new TableFieldSchema().setName("is_step").setType("BOOLEAN"),
             new TableFieldSchema().setName("unit").setType("STRING"),
             new TableFieldSchema().setName("asset_id").setType("INT64"),
-            new TableFieldSchema().setName("security_categories").setType("RECORD").setMode("REPEATED").setFields(ImmutableList.of(
-                    new TableFieldSchema().setName("security_category").setType("INT64")
-            )),
+            new TableFieldSchema().setName("security_categories").setType("INT64").setMode("REPEATED"),
             new TableFieldSchema().setName("created_time").setType("TIMESTAMP"),
             new TableFieldSchema().setName("last_updated_time").setType("TIMESTAMP"),
+            new TableFieldSchema().setName("data_set_id").setType("INT64"),
             new TableFieldSchema().setName("metadata").setType("RECORD").setMode("REPEATED").setFields(ImmutableList.of(
                     new TableFieldSchema().setName("key").setType("STRING"),
                     new TableFieldSchema().setName("value").setType("STRING")
@@ -166,13 +165,9 @@ public class CdfTsHeaderBQ {
                 .to(options.getOutputMainTable())
                 .withSchema(TsHeaderSchemaBQ)
                 .withFormatFunction((TimeseriesMetadata element) -> {
-                    List<TableRow> securityCategories = new ArrayList<>();
+                    List<Long> securityCategories = element.getSecurityCategoriesList();
                     List<TableRow> metadata = new ArrayList<>();
                     DateTimeFormatter formatter = DateTimeFormatter.ISO_INSTANT;
-
-                    for (Long categoryNode : element.getSecurityCategoriesList()) {
-                        securityCategories.add(new TableRow().set("security_category", categoryNode));
-                    }
 
                     for (Map.Entry<String, String> mElement : element.getMetadataMap().entrySet()) {
                         metadata.add(new TableRow()
@@ -190,8 +185,11 @@ public class CdfTsHeaderBQ {
                             .set("unit", element.hasUnit() ? element.getUnit().getValue() : null)
                             .set("asset_id", element.hasAssetId() ? element.getAssetId().getValue() : null)
                             .set("security_categories", securityCategories)
-                            .set("created_time", element.hasCreatedTime() ? formatter.format(Instant.ofEpochMilli(element.getCreatedTime().getValue())) : null)
-                            .set("last_updated_time", element.hasLastUpdatedTime() ? formatter.format(Instant.ofEpochMilli(element.getLastUpdatedTime().getValue())) : null)
+                            .set("created_time", element.hasCreatedTime() ?
+                                    formatter.format(Instant.ofEpochMilli(element.getCreatedTime().getValue())) : null)
+                            .set("last_updated_time", element.hasLastUpdatedTime() ?
+                                    formatter.format(Instant.ofEpochMilli(element.getLastUpdatedTime().getValue())) : null)
+                            .set("data_set_id", element.hasDataSetId() ? element.getDataSetId().getValue() : null)
                             .set("metadata", metadata)
                             .set("row_updated_time", formatter.format(Instant.now()));
                 })

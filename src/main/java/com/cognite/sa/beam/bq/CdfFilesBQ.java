@@ -64,18 +64,17 @@ public class CdfFilesBQ {
             new TableFieldSchema().setName("name").setType("STRING"),
             new TableFieldSchema().setName("mime_type").setType("STRING"),
             new TableFieldSchema().setName("source").setType("STRING"),
-            new TableFieldSchema().setName("asset_ids").setType("RECORD").setMode("REPEATED").setFields(ImmutableList.of(
-                    new TableFieldSchema().setName("asset_id").setType("INT64")
-            )),
+            new TableFieldSchema().setName("asset_ids").setType("INT64").setMode("REPEATED"),
+            new TableFieldSchema().setName("security_categories").setType("INT64").setMode("REPEATED"),
             new TableFieldSchema().setName("uploaded").setType("BOOL"),
             new TableFieldSchema().setName("uploaded_time").setType("TIMESTAMP"),
             new TableFieldSchema().setName("created_time").setType("TIMESTAMP"),
             new TableFieldSchema().setName("last_updated_time").setType("TIMESTAMP"),
+            new TableFieldSchema().setName("data_set_id").setType("INT64"),
             new TableFieldSchema().setName("metadata").setType("RECORD").setMode("REPEATED").setFields(ImmutableList.of(
                     new TableFieldSchema().setName("key").setType("STRING"),
                     new TableFieldSchema().setName("value").setType("STRING")
             )),
-            new TableFieldSchema().setName("data_set_id").setType("INT64"),
             new TableFieldSchema().setName("row_updated_time").setType("TIMESTAMP")
     ));
 
@@ -170,13 +169,10 @@ public class CdfFilesBQ {
                 .to(options.getOutputMainTable())
                 .withSchema(FileMetaSchemaBQ)
                 .withFormatFunction((FileMetadata element) -> {
-                    List<TableRow> assetIds = new ArrayList<>();
+                    List<Long> assetIds = element.getAssetIdsList();
+                    List<Long> securityCategories = element.getSecurityCategoriesList();
                     List<TableRow> metadata = new ArrayList<>();
                     DateTimeFormatter formatter = DateTimeFormatter.ISO_INSTANT;
-
-                    for (Long pathNode : element.getAssetIdsList()) {
-                        assetIds.add(new TableRow().set("asset_id", pathNode));
-                    }
 
                     for (Map.Entry<String, String> mElement : element.getMetadataMap().entrySet()) {
                         metadata.add(new TableRow()
@@ -195,6 +191,7 @@ public class CdfFilesBQ {
                             .set("mime_type", element.hasMimeType() ? element.getMimeType().getValue() : null)
                             .set("source", element.hasSource() ? element.getSource().getValue() : null)
                             .set("asset_ids", assetIds)
+                            .set("security_categories", assetIds)
                             .set("uploaded", element.getUploaded())
                             .set("uploaded_time", element.hasUploadedTime() ?
                                     formatter.format(Instant.ofEpochMilli(element.getUploadedTime().getValue())) : null)
@@ -202,8 +199,8 @@ public class CdfFilesBQ {
                                     formatter.format(Instant.ofEpochMilli(element.getCreatedTime().getValue())) : null)
                             .set("last_updated_time", element.hasLastUpdatedTime() ?
                                     formatter.format(Instant.ofEpochMilli(element.getLastUpdatedTime().getValue())) : null)
-                            .set("metadata", metadata)
                             .set("data_set_id", element.hasDataSetId() ? element.getDataSetId().getValue() : null)
+                            .set("metadata", metadata)
                             .set("row_updated_time", formatter.format(Instant.now()));
                 })
                 .withCreateDisposition(BigQueryIO.Write.CreateDisposition.CREATE_IF_NEEDED)
