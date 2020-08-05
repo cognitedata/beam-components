@@ -1,0 +1,28 @@
+{
+  "name": "CDF Labels to BQ",
+  "description": "Extracts labels from CDF and publishes them to BQ.",
+  "parameters": [{
+                     "name": "cdfSecret",
+                     "label": "CDF source api key--Secret Manager reference",
+                     "help_text": "CDF source api key--Secret Manager reference. ex: <gcp-project-id>.<secret-id>",
+                     "is_optional": false
+                   },
+                    {
+                      "name": "cdfHost",
+                      "label": "CDF api host",
+                      "help_text": "CDF api host. ex: https://api.cognitedata.com",
+                      "is_optional": true
+                    },
+  {
+    "name": "outputMainTable",
+    "label": "Output table in BQ",
+    "help_text": "Project, dataset and table name for the BQ output ex: <project>:<dataset>.<table>",
+    "is_optional": false
+  },
+  {
+    "name": "bqTempStorage",
+    "label": "Temporary storage for writing to BQ",
+    "help_text": "Path and filename prefix for writing temp files. ex: gs://MyBucket/temp",
+    "is_optional": false
+  }]
+}
