@@ -23,6 +23,7 @@ import com.cognite.beam.io.config.Hints;
 import com.cognite.beam.io.config.ProjectConfig;
 import com.cognite.beam.io.config.ReaderConfig;
 import com.cognite.beam.io.dto.Event;
+import com.google.api.services.bigquery.model.Clustering;
 import com.google.api.services.bigquery.model.TableFieldSchema;
 import com.google.api.services.bigquery.model.TableRow;
 import com.google.api.services.bigquery.model.TableSchema;
@@ -224,6 +225,7 @@ public class CdfEventsBQ {
                 })
                 .withCreateDisposition(BigQueryIO.Write.CreateDisposition.CREATE_IF_NEEDED)
                 .withWriteDisposition(BigQueryIO.Write.WriteDisposition.WRITE_TRUNCATE)
+                //.withClustering(new Clustering().setFields(ImmutableList.of("data_set_id", "type", "subtype")))  // TODO--enable this when the BEAM SDK supports it.
                 .optimizedWrites()
                 .withCustomGcsTempLocation(options.getBqTempStorage()));
 

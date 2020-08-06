@@ -24,6 +24,7 @@ import com.cognite.beam.io.config.ProjectConfig;
 import com.cognite.beam.io.config.ReaderConfig;
 import com.cognite.beam.io.dto.Asset;
 import com.cognite.beam.io.servicesV1.RequestParameters;
+import com.google.api.services.bigquery.model.Clustering;
 import com.google.api.services.bigquery.model.TableFieldSchema;
 
 import com.google.api.services.bigquery.model.TableRow;
@@ -218,6 +219,7 @@ public class CdfAssetsBQ {
                 })
                 .withCreateDisposition(BigQueryIO.Write.CreateDisposition.CREATE_IF_NEEDED)
                 .withWriteDisposition(BigQueryIO.Write.WriteDisposition.WRITE_TRUNCATE)
+                //.withClustering(new Clustering().setFields(ImmutableList.of("data_set_id", "root_id"))) // TODO--enable this when the BEAM SDK supports it.
                 .optimizedWrites()
                 .withCustomGcsTempLocation(options.getBqTempStorage()));
 
