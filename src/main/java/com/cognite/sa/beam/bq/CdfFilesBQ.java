@@ -191,7 +191,7 @@ public class CdfFilesBQ {
                             .set("mime_type", element.hasMimeType() ? element.getMimeType().getValue() : null)
                             .set("source", element.hasSource() ? element.getSource().getValue() : null)
                             .set("asset_ids", assetIds)
-                            .set("security_categories", assetIds)
+                            .set("security_categories", securityCategories)
                             .set("uploaded", element.getUploaded())
                             .set("uploaded_time", element.hasUploadedTime() ?
                                     formatter.format(Instant.ofEpochMilli(element.getUploadedTime().getValue())) : null)
