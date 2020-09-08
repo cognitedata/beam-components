@@ -363,7 +363,7 @@ public class ReplicateFiles {
                 .apply("Write target files", CogniteIO.writeFiles()
                         .withProjectConfig(targetConfig)
                         .withHints(Hints.create()
-                                .withWriteShards(20))
+                                .withWriteShards(10))
                         .withWriterConfig(WriterConfig.create()
                                 .withAppIdentifier(appIdentifier)
                                 .withUpsertMode(UpsertMode.REPLACE)));
