@@ -33,12 +33,12 @@
 #---------------------------------------------------------------------
 # The job config file.
 #---------------------------------------------------------------------
-$jobConfigFile = 'gs://' + $gcpBucketPrefix + '-test/config/replicate/job-config-ts-replication.toml'
+$jobConfigFile = $gcpBucketPrefix + '-test/config/replicate/job-config-ts-replication.toml'
 
-mvn compile exec:java -D exec.mainClass=com.cognite.sa.beam.replicate.ReplicateTs -D exec.args="--cdfInputSecret=$cdfInputSecret --cdfInputHost=$cdfInputHost --cdfOutputSecret=$cdfOutputSecret --cdfOutputHost=$cdfOutputHost --jobConfigFile=$jobConfigFile --project=$gcpProject --runner=DataFlowRunner --gcpTempLocation=gs://$gcpBucketPrefix-test/temp --stagingLocation=gs://$gcpBucketPrefix-test/stage/replicate-ts --region=europe-west1 --experiments=shuffle_mode=service --numWorkers=4 --maxNumWorkers=4 --workerMachineType=e2-standard-2"
+mvn compile exec:java -D exec.mainClass=com.cognite.sa.beam.replicate.ReplicateTs -D exec.args="--cdfInputSecret=$cdfInputSecret --cdfInputHost=$cdfInputHost --cdfOutputSecret=$cdfOutputSecret --cdfOutputHost=$cdfOutputHost --jobConfigFile=$jobConfigFile --project=$gcpProject --runner=DataFlowRunner --gcpTempLocation=$gcpBucketPrefix-test/temp --stagingLocation=$gcpBucketPrefix-test/stage/replicate-ts --region=europe-west1 --experiments=shuffle_mode=service --numWorkers=4 --maxNumWorkers=4 --workerMachineType=e2-standard-2"
 
 # Debug
-# --workerLogLevelOverrides='{\""com.cognite.beam.io\"":\""DEBUG\""}'
+# --workerLogLevelOverrides='{\""com.cognite.beam.io\"":\""DEBUG\"", \""NOP\"":\""DEBUG\""}'
 
 # In order to add profiling:
 # --profilingAgentConfiguration='{\""APICurated\"" : true}'

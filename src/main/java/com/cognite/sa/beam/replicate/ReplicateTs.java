@@ -37,6 +37,7 @@ import org.apache.beam.sdk.metrics.Metrics;
 import org.apache.beam.sdk.options.*;
 import org.apache.beam.sdk.transforms.*;
 import org.apache.beam.sdk.values.*;
+import org.apache.beam.vendor.calcite.v1_20_0.org.apache.calcite.runtime.Resources;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,29 +68,33 @@ public class ReplicateTs {
     private static final String dataSetConfigKey = "enableDataSetMapping";
 
     /**
-     * Create target ts point:
+     * Create target batch of ts points:
      *         - If the data point does not have externalId, use the source's id
      */
-    private static class PrepareTsPoint extends DoFn<TimeseriesPoint, TimeseriesPointPost> {
+    private static class PrepareTsPointBatch extends DoFn<Iterable<TimeseriesPoint>, Iterable<TimeseriesPointPost>> {
         @ProcessElement
-        public void processElement(@Element TimeseriesPoint input,
-                                   OutputReceiver<TimeseriesPointPost> out) {
+        public void processElement(@Element Iterable<TimeseriesPoint> input,
+                                   OutputReceiver<Iterable<TimeseriesPointPost>> out) {
+            List<TimeseriesPointPost> outputList = new ArrayList<>(10000);
+            input.forEach(inputPoint -> {
+                TimeseriesPointPost.Builder builder = TimeseriesPointPost.newBuilder()
+                        .setTimestamp(inputPoint.getTimestamp());
+                if (inputPoint.hasExternalId()) {
+                    builder.setExternalId(inputPoint.getExternalId().getValue());
+                } else {
+                    builder.setExternalId(String.valueOf(inputPoint.getId()));
+                }
 
-            TimeseriesPointPost.Builder builder = TimeseriesPointPost.newBuilder()
-                    .setTimestamp(input.getTimestamp());
-            if (input.hasExternalId()) {
-                builder.setExternalId(input.getExternalId().getValue());
-            } else {
-                builder.setExternalId(String.valueOf(input.getId()));
-            }
+                if (inputPoint.getDatapointTypeCase() == TimeseriesPoint.DatapointTypeCase.VALUE_STRING) {
+                    builder.setValueString(inputPoint.getValueString());
+                } else {
+                    builder.setValueNum(inputPoint.getValueNum());
+                }
 
-            if (input.getDatapointTypeCase() == TimeseriesPoint.DatapointTypeCase.VALUE_STRING) {
-                builder.setValueString(input.getValueString());
-            } else {
-                builder.setValueNum(input.getValueNum());
-            }
+                outputList.add(builder.build());
+            });
 
-            out.output(builder.build());
+            out.output(outputList);
         }
     }
 
@@ -518,7 +523,7 @@ public class ReplicateTs {
          - Build the request to read the datapoints for each batch of headers. The time window is specified here.
          - Process all read requests.
          */
-        PCollection<TimeseriesPoint> tsPoints = tsHeaders
+        PCollection<Iterable<TimeseriesPoint>> tsPoints = tsHeaders
                 .apply("Add key", WithKeys.of(ThreadLocalRandom.current().nextInt(20)))
                 .apply("Batch TS items", GroupIntoBatches.<Integer, TimeseriesMetadata>of(
                         KvCoder.of(VarIntCoder.of(), ProtoCoder.of(TimeseriesMetadata.class)))
@@ -538,7 +543,6 @@ public class ReplicateTs {
 
                         Instant fromTime = Instant.now().truncatedTo(ChronoUnit.DAYS); //default
                         int windowDays = Integer.valueOf(config.getOrDefault(tsPointsWindowConfigKey, "1"));
-                        //int windowDays = 1;
 
                         if (windowDays < 0) {
                             // Run full history for negative time windows.
@@ -554,6 +558,11 @@ public class ReplicateTs {
                                 //.minus(8, ChronoUnit.DAYS)
                                 ;
 
+                        // manual definitions
+                        //fromTime = Instant.parse("2015-01-01T00:00:01.00Z");
+                        //fromTime = Instant.ofEpochMilli(31536000000L); // Jan 1st, 1971;
+                        //toTime = Instant.parse("2016-01-01T00:01:00.00Z");
+
                         if (config.getOrDefault(tsPointsConfigKey, "no").equalsIgnoreCase("yes")) {
                             out.output(RequestParameters.create()
                                     .withItems(items)
@@ -563,7 +572,7 @@ public class ReplicateTs {
                         }
                     }
                 }).withSideInputs(configMap))
-                .apply("Read ts points", CogniteIO.readAllTimeseriesPoints()
+                .apply("Read ts points", CogniteIO.readAllDirectTimeseriesPoints()
                         .withProjectConfig(sourceConfig)
                         .withReaderConfig(ReaderConfig.create()
                                 .withAppIdentifier(appIdentifier)));
@@ -574,13 +583,9 @@ public class ReplicateTs {
         - Write the datapoint.
          */
         tsPoints
-                .apply("Build TS point post object", ParDo.of(new PrepareTsPoint()))
-                .apply("Write ts points", CogniteIO.writeTimeseriesPoints()
+                .apply("Build TS point post object", ParDo.of(new PrepareTsPointBatch()))
+                .apply("Write ts points", CogniteIO.writeDirectTimeseriesPoints()
                         .withProjectConfig(targetConfig)
-                        .withHints(Hints.create()
-                                .withWriteTsPointsUpdateFrequency(UpdateFrequency.SECOND)
-                                .withWriteShards(2)
-                                .withWriteMaxBatchLatency(java.time.Duration.ofMinutes(5)))
                         .withWriterConfig(WriterConfig.create()
                                 .withAppIdentifier(appIdentifier)));
 

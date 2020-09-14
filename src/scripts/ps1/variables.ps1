@@ -2,4 +2,4 @@
 $gcpProject = 'your-gcp-project-name'
 
 # The gcp bucket prefix for dataflow artifacts
-$gcpBucketPrefix = 'identifier-dataflow'
+$gcpBucketPrefix = 'gs://identifier-dataflow'

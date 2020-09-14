@@ -13,7 +13,6 @@ $cdfOutputSecret = 'projectId.secretId'
 # The CDF host
 $cdfInputHost = 'https://api.cognitedata.com'
 $cdfOutputHost = 'https://api.cognitedata.com'
-#$cdfOutputHost = 'https://greenfield.cognitedata.com'
 
 # Delta read override
 $fullRead = 'true'
