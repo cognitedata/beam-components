@@ -347,7 +347,7 @@ public class ReplicateFiles {
                 .apply("Read source files", CogniteIO.readAllFiles()
                         .withProjectConfig(sourceConfig)
                         .withHints(Hints.create()
-                                .withReadShards(1000))
+                                .withReadShards(10))
                         .withReaderConfig(ReaderConfig.create()
                                 .withAppIdentifier(appIdentifier)))
                 .apply("Process files", ParDo.of(new PrepareFiles(configMap,
@@ -364,7 +364,7 @@ public class ReplicateFiles {
                 .apply("Write target files", CogniteIO.writeFiles()
                         .withProjectConfig(targetConfig)
                         .withHints(Hints.create()
-                                .withWriteShards(10))
+                                .withWriteShards(5))
                         .withWriterConfig(WriterConfig.create()
                                 .withAppIdentifier(appIdentifier)
                                 .withUpsertMode(UpsertMode.REPLACE)));
