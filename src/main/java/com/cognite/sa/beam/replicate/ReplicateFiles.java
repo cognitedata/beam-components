@@ -329,10 +329,7 @@ public class ReplicateFiles {
                         // Add filter for max lastUpdatedTime
                         RequestParameters req = input
                                 .withFilterParameter("lastUpdatedTime", ImmutableMap.of(
-                                        "max", System.currentTimeMillis()))
-                                // Metadata filters for testing
-                                .withFilterMetadataParameter("DOCUMENT TYPE CODE", "XB");
-//                                .withFilterMetadataParameter("document:abp_tech_location", "FEL");
+                                        "max", System.currentTimeMillis()));
 
                         if (dataSetExternalIds.isEmpty() || allowList.contains("*")) {
                             LOG.info("Will not filter on data set external id ");
