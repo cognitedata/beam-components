@@ -63,9 +63,11 @@ public class ReplicateFiles {
         final Counter missingExtIdCounter = Metrics.counter(PrepareFiles.class,
                 "No external id");
         final Counter assetMapCounter = Metrics.counter(PrepareFiles.class,
-                "Map asset ids");
+                "Asset ids mapped");
+        final Counter noAssetMapCounter = Metrics.counter(PrepareFiles.class,
+                "Asset ids not mapped");
         final Counter dataSetMapCounter = Metrics.counter(PrepareFiles.class,
-                "Map data set");
+                "Data set mapped");
 
         public PrepareFiles(PCollectionView<Map<String, String>> configMap,
                             PCollectionView<Map<Long, String>> sourceAssetsIdMapView,
@@ -113,10 +115,12 @@ public class ReplicateFiles {
                     if (targetAssetsExtIdMap.containsKey(targetAssetExtId)) {
                         fileMetadataBuilder.addAssetIds(targetAssetsExtIdMap.get(targetAssetExtId));
                         assetMapCounter.inc();
+                    } else {
+                        noAssetMapCounter.inc();
+                        LOG.warn("Could not map asset linke for source asset externalId = [{}]",
+                                targetAssetExtId);
                     }
                 }
-                // Should this be inside the for loop?
-                //if (fileMetadataBuilder.getAssetIdsCount() > 0 ) assetMapCounter.inc();
             }
 
             // Map data set if enabled and it is available on the target
