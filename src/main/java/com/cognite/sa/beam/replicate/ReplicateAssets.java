@@ -89,9 +89,13 @@ public class ReplicateAssets {
                                    OutputReceiver<KV<String, Asset>> out,
                                    ProcessContext context) {
             Preconditions.checkArgument(input.hasExternalId(),
-                    String.format("Source assets must have an externalId. Name: [%s], Id: [%d]"));
+                    String.format("Source assets must have an externalId. Name: [%s], Id: [%d]",
+                            input.getName(),
+                            input.getId().getValue()));
             Preconditions.checkArgument(input.hasRootId(),
-                    String.format("Source assets must have a root id. Name: [%s], Id: [%d]"));
+                    String.format("Source assets must have a root id. Name: [%s], Id: [%d]",
+                            input.getName(),
+                            input.getId().getValue()));
             Map<Long, String> sourceAssetsIdMap = context.sideInput(sourceAssetsIdMapView);
             Map<Long, String> sourceDataSetsIdMap = context.sideInput(sourceDataSetsIdMapView);
             Map<String, Long> targetDataSetsExtIdMap = context.sideInput(targetDataSetsExtIdMapView);
