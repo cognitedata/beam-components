@@ -39,6 +39,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 /**
  * This pipeline reads all relationships from the specified cdf instance and writes them to a target BigQuery table.
@@ -63,8 +64,8 @@ public class CdfRelationshipsBQ {
             new TableFieldSchema().setName("start_time").setType("TIMESTAMP"),
             new TableFieldSchema().setName("end_time").setType("TIMESTAMP"),
             new TableFieldSchema().setName("confidence").setType("FLOAT64"),
-            new TableFieldSchema().setName("data_set").setType("STRING"),
-            new TableFieldSchema().setName("relationship_type").setType("STRING"),
+            new TableFieldSchema().setName("data_set_id").setType("INT64"),
+            new TableFieldSchema().setName("labels").setType("STRING").setMode("REPEATED"),
             new TableFieldSchema().setName("created_time").setType("TIMESTAMP"),
             new TableFieldSchema().setName("last_updated_time").setType("TIMESTAMP"),
             new TableFieldSchema().setName("row_updated_time").setType("TIMESTAMP")
@@ -160,24 +161,21 @@ public class CdfRelationshipsBQ {
                 .withSchema(relationshipSchemaBQ)
                 .withFormatFunction((Relationship element) -> {
                     DateTimeFormatter formatter = DateTimeFormatter.ISO_INSTANT;
+                    List<String> labels = element.getLabelsList();
 
                     return new TableRow()
                             .set("external_id", element.getExternalId())
-                            .set("source_external_id", element.hasSource() ?
-                                    element.getSource().getResourceExternalId() : null)
-                            .set("source_type", element.hasSource() ?
-                                    RelationshipParser.toString(element.getSource().getResourceType()) : null)
-                            .set("target_external_id", element.hasTarget() ?
-                                    element.getTarget().getResourceExternalId() : null)
-                            .set("target_type", element.hasTarget() ?
-                                    RelationshipParser.toString(element.getTarget().getResourceType()) : null)
+                            .set("source_external_id", element.getSourceExternalId())
+                            .set("source_type", RelationshipParser.toString(element.getSourceType()))
+                            .set("target_external_id", element.getTargetExternalId())
+                            .set("target_type", RelationshipParser.toString(element.getTargetType()))
                             .set("start_time", element.hasStartTime() ?
                                     formatter.format(Instant.ofEpochMilli(element.getStartTime().getValue())) : null)
                             .set("end_time", element.hasEndTime() ?
                                     formatter.format(Instant.ofEpochMilli(element.getEndTime().getValue())) : null)
                             .set("confidence", element.getConfidence())
-                            .set("data_set", element.getDataSet())
-                            .set("relationship_type", RelationshipParser.toString(element.getRelationshipType()))
+                            .set("data_set_id", element.hasDataSetId() ? element.getDataSetId().getValue() : null)
+                            .set("labels", labels)
                             .set("created_time", element.hasCreatedTime() ?
                                     formatter.format(Instant.ofEpochMilli(element.getCreatedTime().getValue())) : null)
                             .set("last_updated_time", element.hasLastUpdatedTime() ?
