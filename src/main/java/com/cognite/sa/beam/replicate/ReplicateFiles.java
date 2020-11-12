@@ -171,7 +171,7 @@ public class ReplicateFiles {
         /**
          * Specify the job configuration file.
          */
-        @Description("The job config file. The name should be in the format of gs://<bucket>/folder.")
+        @Description("The job config file. The name should be in the format of gs://<bucket>/folder/file.toml.")
         @Validation.Required
         ValueProvider<String> getJobConfigFile();
         void setJobConfigFile(ValueProvider<String> value);
@@ -185,6 +185,11 @@ public class ReplicateFiles {
         @Default.Boolean(false)
         ValueProvider<Boolean> getFullRead();
         void setFullRead(ValueProvider<Boolean> value);
+
+        @Description("Temp storage for large files. The name should be in the format of gs://<bucket>/folder/.")
+        @Validation.Required
+        ValueProvider<String> getTempStorageUri();
+        void setTempStorageUri(ValueProvider<String> value);
     }
 
     private static PipelineResult runReplicateFiles(ReplicateFilesOptions options) throws IOException {
@@ -349,7 +354,8 @@ public class ReplicateFiles {
                         .withHints(Hints.create()
                                 .withReadShards(10))
                         .withReaderConfig(ReaderConfig.create()
-                                .withAppIdentifier(appIdentifier)))
+                                .withAppIdentifier(appIdentifier))
+                        .withTempStorageURI(options.getTempStorageUri()))
                 .apply("Process files", ParDo.of(new PrepareFiles(configMap,
                         sourceAssetsIdMap,
                         targetAssetsExtIdMap,
