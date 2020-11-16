@@ -69,7 +69,8 @@ public class ReplicateTs {
 
     /**
      * Create target batch of ts points:
-     *         - If the data point does not have externalId, use the source's id
+     *         - If the data point does not have externalId, use the source's id.
+     *         - Check boundary conditions (valid value range) for numeric data points.
      */
     private static class PrepareTsPointBatch extends DoFn<Iterable<TimeseriesPoint>, Iterable<TimeseriesPointPost>> {
         @ProcessElement
@@ -88,7 +89,25 @@ public class ReplicateTs {
                 if (inputPoint.getDatapointTypeCase() == TimeseriesPoint.DatapointTypeCase.VALUE_STRING) {
                     builder.setValueString(inputPoint.getValueString());
                 } else {
-                    builder.setValueNum(inputPoint.getValueNum());
+                    // numeric data point. Check for value range limits
+                    double value = inputPoint.getValueNum();
+                    if (value > 1e100) {
+                        LOG.warn("Numeric data point out of range (> 1e100). Will truncate the value to 1e100."
+                                + " externalId: {}, timestamp: {}, value: {}",
+                                builder.getExternalId(),
+                                inputPoint.getTimestamp(),
+                                inputPoint.getValueNum());
+                        value = 1e100;
+                    }
+                    if (value < -1e100) {
+                        LOG.warn("Numeric data point out of range (< -1e100). Will truncate the value to -1e100."
+                                        + " externalId: {}, timestamp: {}, value: {}",
+                                builder.getExternalId(),
+                                inputPoint.getTimestamp(),
+                                inputPoint.getValueNum());
+                        value = -1e100;
+                    }
+                    builder.setValueNum(value);
                 }
 
                 outputList.add(builder.build());
