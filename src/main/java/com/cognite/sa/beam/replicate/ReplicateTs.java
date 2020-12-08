@@ -446,10 +446,10 @@ public class ReplicateTs {
                         .withProjectConfig(sourceConfig)
                         .withReaderConfig(ReaderConfig.create()
                                 .withAppIdentifier(appIdentifier)))
-                .apply("Filter out TS w/ security categories", Filter.by(
-                        tsHeader -> tsHeader.getSecurityCategoriesList().isEmpty()
-                                && !tsHeader.getName().getValue().startsWith("SRE-cognite-sre-Timeseries")
-                ))
+                //.apply("Filter out TS w/ security categories", Filter.by(
+                //        tsHeader -> tsHeader.getSecurityCategoriesList().isEmpty()
+                //                && !tsHeader.getName().getValue().startsWith("SRE-cognite-sre-Timeseries")
+                //))
                 .apply("Filter ts", ParDo.of(new DoFn<TimeseriesMetadata, TimeseriesMetadata>() {
                     @ProcessElement
                     public void processElement(@Element TimeseriesMetadata input,
