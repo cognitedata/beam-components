@@ -12,8 +12,10 @@
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <beam.version>2.24.0</beam.version>
-        <beam.connector.version>0.9.10</beam.connector.version>
+        <beam.version>2.25.0</beam.version>
+        <beam.connector.version>0.9.12</beam.connector.version>
+        <junit.version>5.7.0</junit.version>
+        <logback.classic.version>1.2.3</logback.classic.version>
         <maven-jar-plugin.version>3.0.0</maven-jar-plugin.version>
     </properties>
 
@@ -53,19 +55,19 @@
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
-            <version>5.5.2</version>
+            <version>${junit.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-engine</artifactId>
-            <version>5.5.2</version>
+            <version>${junit.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
-            <version>1.2.3</version>
+            <version>${logback.classic.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
