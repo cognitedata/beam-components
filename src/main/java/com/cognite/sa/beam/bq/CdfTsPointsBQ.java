@@ -164,7 +164,7 @@ public class CdfTsPointsBQ {
                 .apply("Add key", WithKeys.of(ThreadLocalRandom.current().nextInt(20)))
                 .apply("Batch TS items", GroupIntoBatches.<Integer, TimeseriesMetadata>of(
                         KvCoder.of(VarIntCoder.of(), ProtoCoder.of(TimeseriesMetadata.class)))
-                        .withMaxBatchSize(50))
+                        .withMaxBatchSize(20))
                 .apply("Remove key", Values.create())
                 .apply("Break fusion", BreakFusion.create())
                 .apply("Build ts points request", ParDo.of(new DoFn<Iterable<TimeseriesMetadata>, RequestParameters>() {
