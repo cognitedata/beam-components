@@ -24,14 +24,21 @@ import com.cognite.beam.io.config.ReaderConfig;
 import com.cognite.beam.io.dto.TimeseriesMetadata;
 import com.cognite.beam.io.dto.TimeseriesPoint;
 import com.cognite.beam.io.servicesV1.RequestParameters;
+import com.cognite.beam.io.transform.BreakFusion;
+import com.cognite.beam.io.transform.GroupIntoBatches;
 import com.google.api.services.bigquery.model.*;
 import com.google.common.collect.ImmutableMap;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.PipelineResult;
+import org.apache.beam.sdk.coders.KvCoder;
+import org.apache.beam.sdk.coders.VarIntCoder;
+import org.apache.beam.sdk.extensions.protobuf.ProtoCoder;
 import org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO;
 import org.apache.beam.sdk.options.*;
 import org.apache.beam.sdk.transforms.Filter;
 import org.apache.beam.sdk.transforms.MapElements;
+import org.apache.beam.sdk.transforms.Values;
+import org.apache.beam.sdk.transforms.WithKeys;
 import org.apache.beam.sdk.values.PCollection;
 import org.apache.beam.sdk.values.TypeDescriptor;
 import org.slf4j.Logger;
@@ -41,6 +48,10 @@ import java.io.IOException;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * This pipeline reads TS data points along a rolling time window from the specified cdp instance and writes
@@ -160,21 +171,33 @@ public class CdfTsPointsHourBQ {
                 ));
 
         // Read ts points for all headers
-        PCollection<TimeseriesPoint> tsPoints = tsHeaders.apply("Build ts points request", MapElements
-                .into(TypeDescriptor.of(RequestParameters.class))
-                .via((TimeseriesMetadata header) -> {
-                    // set time window to the past 1 - 2 days
-                    Instant fromTime = Instant.now().truncatedTo(ChronoUnit.DAYS)
-                            .minus(4, ChronoUnit.DAYS);
+        PCollection<TimeseriesPoint> tsPoints = tsHeaders
+                .apply("Add key", WithKeys.of(ThreadLocalRandom.current().nextInt(20)))
+                .apply("Batch TS items", GroupIntoBatches.<Integer, TimeseriesMetadata>of(
+                        KvCoder.of(VarIntCoder.of(), ProtoCoder.of(TimeseriesMetadata.class)))
+                        .withMaxBatchSize(20))
+                .apply("Remove key", Values.create())
+                .apply("Break fusion", BreakFusion.create())
+                .apply("Build ts points request", MapElements
+                        .into(TypeDescriptor.of(RequestParameters.class))
+                        .via((Iterable<TimeseriesMetadata> input) -> {
+                            List<Map<String, Object>> items = new ArrayList<>();
+                            for (TimeseriesMetadata ts : input) {
+                                items.add(ImmutableMap.of("id", ts.getId().getValue()));
+                            }
 
-                    return RequestParameters.create()
-                            .withItems(ImmutableList.of(ImmutableMap.of("id", header.getId().getValue())))
-                            .withRootParameter("start", fromTime.toEpochMilli())
-                            .withRootParameter("limit", 10000)
-                            .withRootParameter("aggregates", ImmutableList.of("average", "max", "min", "count", "sum",
-                                    "interpolation", "stepInterpolation", "interpolation", "continuousVariance",
-                                    "discreteVariance", "totalVariation"))
-                            .withRootParameter("granularity", "1h");
+                            // set time window to the past 1 - 2 days
+                            Instant fromTime = Instant.now().truncatedTo(ChronoUnit.DAYS)
+                                    .minus(4, ChronoUnit.DAYS);
+
+                            return RequestParameters.create()
+                                    .withItems(items)
+                                    .withRootParameter("start", fromTime.toEpochMilli())
+                                    .withRootParameter("limit", 10000)
+                                    .withRootParameter("aggregates", ImmutableList.of("average", "max", "min", "count", "sum",
+                                            "interpolation", "stepInterpolation", "interpolation", "continuousVariance",
+                                            "discreteVariance", "totalVariation"))
+                                    .withRootParameter("granularity", "1h");
                 }))
                 .apply("Read ts points", CogniteIO.readAllTimeseriesPoints()
                         .withProjectConfig(projectConfig)
