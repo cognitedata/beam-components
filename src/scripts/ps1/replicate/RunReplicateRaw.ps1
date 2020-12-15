@@ -33,6 +33,6 @@
 #---------------------------------------------------------------------
 # The job config file.
 #---------------------------------------------------------------------
-$jobConfigFile = 'gs://' + $gcpBucketPrefix + '-test/config/replicate/job-config-raw-replication.toml'
+$jobConfigFile = $gcpBucketPrefix + '-test/config/replicate/job-config-raw-replication.toml'
 
 mvn compile exec:java -D exec.mainClass=com.cognite.sa.beam.replicate.ReplicateRaw -D exec.args="--cdfInputSecret=$cdfInputSecret --cdfInputHost=$cdfInputHost --cdfOutputSecret=$cdfOutputSecret --cdfOutputHost=$cdfOutputHost --jobConfigFile=$jobConfigFile"
