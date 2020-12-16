@@ -41,7 +41,7 @@ public class CdfSequenceRowsBQ {
     /* BQ output schema */
     private static final TableSchema SequenceRowsSchemaBQ = new TableSchema().setFields(ImmutableList.of(
             new TableFieldSchema().setName("seq_external_id").setType("STRING"),
-            //new TableFieldSchema().setName("row_number").setType("INT64"),
+            new TableFieldSchema().setName("row_number").setType("INT64"),
             new TableFieldSchema().setName("rows").setType("RECORD").setMode("REPEATED").setFields(ImmutableList.of(
                     new TableFieldSchema().setName("key").setType("STRING"),
                     new TableFieldSchema().setName("value").setType("STRING")
@@ -135,10 +135,10 @@ public class CdfSequenceRowsBQ {
                                                OutputReceiver<SequenceBody> out,
                                                ProcessContext context) {
                         for (SequenceRow row : input.getRowsList())  {
+                            long rowNumber = row.getRowNumber();
                             out.output(input.toBuilder()
                                     .clearRows()
                                     .addRows(row)
-                            // TODO: Add row number or SequenceBody using row.getRowNumber()
                                     .build());
                         }
                     }
@@ -178,18 +178,10 @@ public class CdfSequenceRowsBQ {
 
                     return new TableRow()
                             .set("seq_external_id", element.hasExternalId() ? element.getExternalId().getValue() : null)
+                            .set("row_number", row.getRowNumber())
                             .set("rows", rows)
                             .set("row_updated_time", formatter.format(Instant.now()));
 
-                    /*
-                            new TableFieldSchema().setName("seq_external_id").setType("STRING"),
-                            //new TableFieldSchema().setName("row_number").setType("INT64"),
-                            new TableFieldSchema().setName("rows").setType("RECORD").setMode("REPEATED").setFields(ImmutableList.of(
-                                    new TableFieldSchema().setName("key").setType("STRING"),
-                                    new TableFieldSchema().setName("value").setType("STRING")
-                            )),
-                            new TableFieldSchema().setName("row_updated_time").setType("TIMESTAMP")
-                     */
                 })
                 .withCreateDisposition(BigQueryIO.Write.CreateDisposition.CREATE_IF_NEEDED)
                 .withWriteDisposition(BigQueryIO.Write.WriteDisposition.WRITE_TRUNCATE)
