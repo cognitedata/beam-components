@@ -1,8 +1,7 @@
-# beam-components
-Collection of stand-alone Beam jobs
+# Apache Beam Components
+Collection of stand-alone Apache Beam jobs
 
 Current jobs: 
 - Replicator
 - Write to Big Query
 
-Default staging is gs://sa-sandbox-training/beam-component
