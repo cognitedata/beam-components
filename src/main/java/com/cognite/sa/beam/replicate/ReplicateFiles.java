@@ -25,6 +25,7 @@ import com.cognite.beam.io.dto.FileMetadata;
 import com.cognite.beam.io.RequestParameters;
 import com.cognite.beam.io.transform.toml.ReadTomlStringArray;
 import com.cognite.beam.io.transform.toml.ReadTomlStringMap;
+import com.cognite.client.config.UpsertMode;
 import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.Int64Value;
 import com.google.protobuf.StringValue;

@@ -21,8 +21,6 @@ import com.cognite.beam.io.config.*;
 import com.cognite.client.config.UpsertMode;
 import com.cognite.beam.io.dto.*;
 import com.cognite.beam.io.RequestParameters;
-import com.cognite.beam.io.transform.BreakFusion;
-import com.cognite.beam.io.transform.GroupIntoBatches;
 import com.cognite.beam.io.transform.toml.ReadTomlStringArray;
 import com.cognite.beam.io.transform.toml.ReadTomlStringMap;
 import com.google.common.collect.ImmutableMap;
@@ -30,9 +28,6 @@ import com.google.protobuf.Int64Value;
 import com.google.protobuf.StringValue;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.PipelineResult;
-import org.apache.beam.sdk.coders.KvCoder;
-import org.apache.beam.sdk.coders.VarIntCoder;
-import org.apache.beam.sdk.extensions.protobuf.ProtoCoder;
 import org.apache.beam.sdk.metrics.Counter;
 import org.apache.beam.sdk.metrics.Metrics;
 import org.apache.beam.sdk.options.*;
@@ -46,7 +41,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ThreadLocalRandom;
 
 public class ReplicateSequences {
     // The log to output status messages to.
@@ -73,11 +67,11 @@ public class ReplicateSequences {
         PCollectionView<Map<Long, String>> sourceDataSetsIdMapView;
         PCollectionView<Map<String, Long>> targetDataSetsIdMapView;
 
-        final Counter missingExtCounter = Metrics.counter(ReplicateSequences.PrepareSequenceHeader.class,
+        final Counter missingExtCounter = Metrics.counter(PrepareSequenceHeader.class,
                 "No external id");
-        final Counter assetMapCounter = Metrics.counter(ReplicateSequences.PrepareSequenceHeader.class,
+        final Counter assetMapCounter = Metrics.counter(PrepareSequenceHeader.class,
                 "Map asset ids");
-        final Counter dataSetMapCounter = Metrics.counter(ReplicateSequences.PrepareSequenceHeader.class,
+        final Counter dataSetMapCounter = Metrics.counter(PrepareSequenceHeader.class,
                 "Map data set");
 
         PrepareSequenceHeader(PCollectionView<Map<String, String>> configMap,

@@ -24,6 +24,7 @@ import com.cognite.beam.io.transform.BreakFusion;
 import com.cognite.beam.io.transform.GroupIntoBatches;
 import com.cognite.beam.io.transform.toml.ReadTomlStringArray;
 import com.cognite.beam.io.transform.toml.ReadTomlStringMap;
+import com.cognite.client.config.UpsertMode;
 import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.Int64Value;
 import com.google.protobuf.StringValue;
