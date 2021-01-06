@@ -35,7 +35,7 @@
 #---------------------------------------------------------------------
 $jobConfigFile = $gcpBucketPrefix + '-test/config/replicate/job-config-sequences-replication.toml'
 
-mvn compile exec:java -D exec.mainClass=com.cognite.sa.beam.replicate.ReplicateSequences -D exec.args="--cdfInputSecret=$cdfInputSecret --cdfInputHost=$cdfInputHost --cdfOutputSecret=$cdfOutputSecret --cdfOutputHost=$cdfOutputHost --jobConfigFile=$jobConfigFile --project=$gcpProject --runner=DataFlowRunner --gcpTempLocation=$gcpBucketPrefix-test/temp --stagingLocation=$gcpBucketPrefix-test/stage/replicate-ts --region=europe-west1 --experiments=shuffle_mode=service --numWorkers=1 --maxNumWorkers=2 --workerMachineType=e2-standard-2"
+mvn compile exec:java -D exec.mainClass=com.cognite.sa.beam.replicate.ReplicateSequences -D exec.args="--cdfInputSecret=$cdfInputSecret --cdfInputHost=$cdfInputHost --cdfOutputSecret=$cdfOutputSecret --cdfOutputHost=$cdfOutputHost --jobConfigFile=$jobConfigFile --project=$gcpProject --runner=DataFlowRunner --gcpTempLocation=$gcpBucketPrefix-test/temp --stagingLocation=$gcpBucketPrefix-test/stage/replicate-sequences --region=europe-west1 --experiments=shuffle_mode=service --numWorkers=1 --maxNumWorkers=4 --workerMachineType=e2-standard-2"
 
 # Debug
 # --workerLogLevelOverrides='{\""com.cognite.beam.io\"":\""DEBUG\"", \""NOP\"":\""DEBUG\""}'

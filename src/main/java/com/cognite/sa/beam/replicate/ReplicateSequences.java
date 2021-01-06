@@ -243,7 +243,7 @@ public class ReplicateSequences {
         PCollectionView<List<String>> sequenceDenyList = p
                 .apply("Read sequence deny list", ReadTomlStringArray.from(options.getJobConfigFile())
                         .withArrayKey("denyList.sequenceExternalId"))
-                .apply("Log ts deny", MapElements.into(TypeDescriptors.strings())
+                .apply("Log sequence deny", MapElements.into(TypeDescriptors.strings())
                         .via(expression -> {
                             LOG.info("Registered sequence extId deny: {}", expression);
                             return expression;
@@ -253,7 +253,7 @@ public class ReplicateSequences {
 
         /*
         Read the asset hierarchies from source and target. Shave off the metadata and use id + externalId
-        as the basis for mapping Files to Assets. Project the asset collections as views so that they can be
+        as the basis for mapping sequences to assets. Project the asset collections as views so that they can be
         used as side inputs to the main File transform.
          */
         PCollectionView<Map<Long, String>> sourceAssetsIdMap = p
@@ -404,8 +404,6 @@ public class ReplicateSequences {
                                 sourceDataSetsIdMap, targetDataSetsExtIdMap))
                 .apply("Write Sequence Headers", CogniteIO.writeSequencesMetadata()
                         .withProjectConfig(targetConfig)
-                        .withHints(Hints.create()
-                                .withWriteShards(20))
                         .withWriterConfig(WriterConfig.create()
                                 .withAppIdentifier(appIdentifier)
                                 .withUpsertMode(UpsertMode.REPLACE)));

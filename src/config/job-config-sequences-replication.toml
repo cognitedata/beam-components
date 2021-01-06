@@ -1,8 +1,7 @@
 # General config options
 [config]
-sequenceHeaders = "yes"         # synch ts headers
-sequenceRows = "yes"            # synch ts points
-sequencePointsWindowDays = "1"  # the time window (in days) for ts points synch, use "-1" for full history
+sequenceHeaders = "yes"         # synch sequence headers
+sequenceRows = "yes"            # synch sequences rows
 enableContextualization = "yes" # yes/no, try linking the Sequence headers to assets
 enableDataSetMapping = "yes"    # yes/no, try mapping the source data set to target data set
 
@@ -10,7 +9,7 @@ enableDataSetMapping = "yes"    # yes/no, try mapping the source data set to tar
 # The exact match on externalId is unioned with the regex expression.
 # Example: "\\d" for digit, "\\\\" for backslash.
 [denyList]
-sequenceExternalId = []           # leave empty for no deny list
+sequenceExternalId = []             # leave empty for no deny list
 [allowList]
-dataSetExternalId = ["*"]   # "*" includes all data sets
-sequenceExternalId = ["*"]                       # include all TS
+dataSetExternalId = ["*"]           # "*" includes all data sets
+sequenceExternalId = ["*"]          # include all sequences
