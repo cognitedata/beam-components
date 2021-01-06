@@ -19,7 +19,7 @@ package com.cognite.sa.beam;
 import com.cognite.beam.io.CogniteIO;
 import com.cognite.beam.io.config.ReaderConfig;
 import com.cognite.beam.io.dto.TimeseriesPoint;
-import com.cognite.beam.io.servicesV1.RequestParameters;
+import com.cognite.beam.io.RequestParameters;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.io.TextIO;

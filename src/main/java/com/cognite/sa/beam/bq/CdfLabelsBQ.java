@@ -22,8 +22,6 @@ import com.cognite.beam.io.config.GcpSecretConfig;
 import com.cognite.beam.io.config.ProjectConfig;
 import com.cognite.beam.io.config.ReaderConfig;
 import com.cognite.beam.io.dto.Label;
-import com.cognite.beam.io.dto.Relationship;
-import com.cognite.beam.io.servicesV1.parser.RelationshipParser;
 import com.google.api.services.bigquery.model.TableFieldSchema;
 import com.google.api.services.bigquery.model.TableRow;
 import com.google.api.services.bigquery.model.TableSchema;
@@ -36,7 +34,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 

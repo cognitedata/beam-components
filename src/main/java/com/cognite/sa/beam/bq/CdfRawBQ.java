@@ -24,7 +24,7 @@ import com.cognite.beam.io.config.ProjectConfig;
 import com.cognite.beam.io.config.ReaderConfig;
 import com.cognite.beam.io.dto.RawRow;
 import com.cognite.beam.io.dto.RawTable;
-import com.cognite.beam.io.servicesV1.RequestParameters;
+import com.cognite.beam.io.RequestParameters;
 import com.cognite.beam.io.transform.BreakFusion;
 import com.google.api.services.bigquery.model.*;
 import com.google.protobuf.Value;
