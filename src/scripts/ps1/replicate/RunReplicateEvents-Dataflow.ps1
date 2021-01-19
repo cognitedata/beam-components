@@ -39,7 +39,7 @@
 #---------------------------------------------------------------------
 # The job config file.
 #---------------------------------------------------------------------
-$jobConfigFile = $gcpBucketPrefix + '-test/config/replicate/job-config-events-replication-test-ims-ams.toml'
+#$jobConfigFile = $gcpBucketPrefix + '-test/config/replicate/job-config-events-replication.toml'
 
 #---------------------------------------------------------------------
 # The delta identifier
