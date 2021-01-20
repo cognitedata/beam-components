@@ -39,12 +39,12 @@
 #---------------------------------------------------------------------
 # The job config file.
 #---------------------------------------------------------------------
-#$jobConfigFile = $gcpBucketPrefix + '-test/config/replicate/job-config-events-replication.toml'
+$jobConfigFile = $gcpBucketPrefix + '-test/config/replicate/job-config-events-replication.toml'
 
 #---------------------------------------------------------------------
 # The delta identifier
 #---------------------------------------------------------------------
-#$deltaIdentifier = 'event-replicator'
+$deltaIdentifier = 'event-replicator'
 
 mvn compile exec:java -D exec.mainClass=com.cognite.sa.beam.replicate.ReplicateEvents -D exec.args="--cdfInputSecret=$cdfInputSecret --cdfInputHost=$cdfInputHost --cdfOutputSecret=$cdfOutputSecret --cdfOutputHost=$cdfOutputHost --jobConfigFile=$jobConfigFile --fullRead=$fullRead --deltaIdentifier=$deltaIdentifier --project=$gcpProject --runner=DataFlowRunner --gcpTempLocation=$gcpBucketPrefix-test/temp --stagingLocation=$gcpBucketPrefix-test/stage/replicate/replicate-events --region=europe-west1 --experiments=shuffle_mode=service --numWorkers=4 --maxNumWorkers=6 --experiments=enable_stackdriver_agent_metrics --workerMachineType=e2-standard-2"
 
