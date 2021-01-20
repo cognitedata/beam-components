@@ -36,5 +36,11 @@
                    "label": "Full read override",
                    "help_text": "Overrides the delta load. Set to <true> for full read, <false> for delta read.",
                    "is_optional": false
+                 },
+                 {
+                   "name": "deltaIdentifier",
+                   "label": "The source delta read identifier",
+                   "help_text": "Sets the source delta read identifier. The default value is 'event-replicator'. Use a descriptive identifier",
+                   "is_optional": true
                  }]
 }
