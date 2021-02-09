@@ -18,8 +18,8 @@ package com.cognite.sa.beam.replicate;
 
 import com.cognite.beam.io.CogniteIO;
 import com.cognite.beam.io.config.*;
-import com.cognite.beam.io.dto.RawRow;
-import com.cognite.beam.io.dto.RawTable;
+import com.cognite.client.dto.RawRow;
+import com.cognite.client.dto.RawTable;
 import com.cognite.beam.io.RequestParameters;
 import com.cognite.beam.io.transform.BreakFusion;
 import com.cognite.beam.io.transform.toml.ReadTomlStringArray;

@@ -18,7 +18,7 @@ package com.cognite.sa.beam.replicate;
 
 import com.cognite.beam.io.CogniteIO;
 import com.cognite.beam.io.config.*;
-import com.cognite.beam.io.dto.*;
+import com.cognite.client.dto.*;
 import com.cognite.beam.io.RequestParameters;
 import com.cognite.beam.io.transform.toml.ReadTomlStringArray;
 import com.cognite.beam.io.transform.toml.ReadTomlStringMap;
