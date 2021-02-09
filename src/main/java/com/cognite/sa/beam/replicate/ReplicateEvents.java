@@ -204,6 +204,11 @@ public class ReplicateEvents {
         ValueProvider<String> getCdfOutputSecret();
         void setCdfOutputSecret(ValueProvider<String> value);
 
+        @Description("The source delta read identifier. The default value is 'event-replicator'. Use a descriptive identifier.")
+        @Default.String("event-replicator")
+        ValueProvider<String> getDeltaIdentifier();
+        void setDeltaIdentifier(ValueProvider<String> value);
+
         @Description("The CDF target host name. The default value is https://api.cognitedata.com.")
         @Default.String("https://api.cognitedata.com")
         ValueProvider<String> getCdfOutputHost();
@@ -400,7 +405,7 @@ public class ReplicateEvents {
                         .withReaderConfig(ReaderConfig.create()
                                 .withAppIdentifier(appIdentifier)
                                 .enableDeltaRead("system.replicator-delta-timestamp")
-                                .withDeltaIdentifier("event-replicator")
+                                .withDeltaIdentifier(options.getDeltaIdentifier())
                                 .withDeltaOffset(Duration.ofHours(2))
                                 .withFullReadOverride(options.getFullRead())))
                 .apply("Process events", ParDo.of(new PrepareEvents(configMap, sourceAssetsIdMap,

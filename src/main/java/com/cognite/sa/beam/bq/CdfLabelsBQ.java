@@ -139,7 +139,7 @@ public class CdfLabelsBQ {
                     return new TableRow()
                             .set("external_id", element.getExternalId())
                             .set("name", element.getName())
-                            .set("description", element.hasDescription() ? element.getDescription() : null)
+                            .set("description", element.hasDescription() ? element.getDescription().getValue() : null)
                             .set("created_time", element.hasCreatedTime()
                                     ? formatter.format(Instant.ofEpochMilli(element.getCreatedTime().getValue())) : null)
                             .set("row_updated_time", formatter.format(Instant.now()));

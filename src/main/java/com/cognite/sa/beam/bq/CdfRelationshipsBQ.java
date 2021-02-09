@@ -172,7 +172,7 @@ public class CdfRelationshipsBQ {
                                     formatter.format(Instant.ofEpochMilli(element.getStartTime().getValue())) : null)
                             .set("end_time", element.hasEndTime() ?
                                     formatter.format(Instant.ofEpochMilli(element.getEndTime().getValue())) : null)
-                            .set("confidence", element.getConfidence())
+                            .set("confidence", element.hasConfidence() ? element.getConfidence().getValue() : null)
                             .set("data_set_id", element.hasDataSetId() ? element.getDataSetId().getValue() : null)
                             .set("labels", labels)
                             .set("created_time", element.hasCreatedTime() ?
