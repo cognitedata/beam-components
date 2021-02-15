@@ -14,12 +14,6 @@
      "is_optional": true
    },
   {
-    "name": "fullRead",
-    "label": "Full read override.",
-    "help_text": "Set to true for full read. Set to false for delta read. Default is false.",
-    "is_optional": false
-  },
-  {
     "name": "outputMainTable",
     "label": "Output table in BQ",
     "help_text": "Project, dataset and tablename for the BQ output ex: <project>:<dataset>.<table>",
