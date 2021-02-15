@@ -1,0 +1,34 @@
+{
+  "name": "CDF Sequence Header to BQ",
+  "description": "Extracts all Sequence headers from CDF and publishes them to BQ.",
+  "parameters": [{
+    "name": "cdfSecret",
+    "label": "CDF source api key--Secret Manager reference",
+    "help_text": "CDF source api key--Secret Manager reference. ex: <gcp-project-id>.<secret-id>",
+    "is_optional": false
+  },
+   {
+     "name": "cdfHost",
+     "label": "CDF api host",
+     "help_text": "CDF api host. ex: https://api.cognitedata.com",
+     "is_optional": true
+   },
+  {
+    "name": "fullRead",
+    "label": "Full read override.",
+    "help_text": "Set to true for full read. Set to false for delta read. Default is false.",
+    "is_optional": false
+  },
+  {
+    "name": "outputMainTable",
+    "label": "Output table in BQ",
+    "help_text": "Project, dataset and tablename for the BQ output ex: <project>:<dataset>.<table>",
+    "is_optional": false
+  },
+  {
+    "name": "bqTempStorage",
+    "label": "Temporary storage for writing to BQ",
+    "help_text": "Path and filename prefix for writing temp files. ex: gs://MyBucket/temp",
+    "is_optional": false
+  }]
+}
