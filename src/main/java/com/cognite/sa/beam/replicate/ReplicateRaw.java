@@ -18,11 +18,10 @@ package com.cognite.sa.beam.replicate;
 
 import com.cognite.beam.io.CogniteIO;
 import com.cognite.beam.io.config.*;
-import com.cognite.beam.io.dto.RawRow;
-import com.cognite.beam.io.dto.RawTable;
-import com.cognite.beam.io.servicesV1.RequestParameters;
+import com.cognite.client.dto.RawRow;
+import com.cognite.client.dto.RawTable;
+import com.cognite.beam.io.RequestParameters;
 import com.cognite.beam.io.transform.BreakFusion;
-import com.cognite.beam.io.transform.toml.ReadTomlFile;
 import com.cognite.beam.io.transform.toml.ReadTomlStringArray;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.PipelineResult;
@@ -34,9 +33,7 @@ import org.apache.beam.sdk.values.TypeDescriptor;
 import org.apache.beam.sdk.values.TypeDescriptors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tomlj.*;
 
-import java.util.ArrayList;
 import java.util.List;
 /**
  * This pipeline reads raw tables from the specified cdp instance and writes them to a target CDF instance.

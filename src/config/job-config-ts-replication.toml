@@ -15,5 +15,5 @@ tsExternalIdRegEx = []      # leave empty for no deny list
 tsExternalId = []           # leave empty for no deny list
 [allowList]
 dataSetExternalId = ["*"]           # "*" includes all data sets
-tsExternalIdRegEx = []      # leave empty for no whitelist
+tsExternalIdRegEx = []      # leave empty for no allow list
 tsExternalId = ["*"]        # include all TS

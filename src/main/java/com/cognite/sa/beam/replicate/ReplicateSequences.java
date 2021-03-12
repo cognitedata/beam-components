@@ -18,11 +18,11 @@ package com.cognite.sa.beam.replicate;
 
 import com.cognite.beam.io.CogniteIO;
 import com.cognite.beam.io.config.*;
+import com.cognite.client.config.UpsertMode;
 import com.cognite.client.dto.*;
 import com.cognite.beam.io.RequestParameters;
 import com.cognite.beam.io.transform.toml.ReadTomlStringArray;
 import com.cognite.beam.io.transform.toml.ReadTomlStringMap;
-import com.cognite.client.config.UpsertMode;
 import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.Int64Value;
 import com.google.protobuf.StringValue;
@@ -32,78 +32,72 @@ import org.apache.beam.sdk.metrics.Counter;
 import org.apache.beam.sdk.metrics.Metrics;
 import org.apache.beam.sdk.options.*;
 import org.apache.beam.sdk.transforms.*;
-import org.apache.beam.sdk.values.KV;
-import org.apache.beam.sdk.values.PCollection;
-import org.apache.beam.sdk.values.PCollectionView;
-import org.apache.beam.sdk.values.TypeDescriptors;
+import org.apache.beam.sdk.values.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * This pipeline reads events from the specified cdf instance and writes them to a target cdf.
- *
- * The events can be linked to assets at the target based on externalId mapping from the assets in the source.
- *
- * This job is prepared to be deployed as a template on GCP (Dataflow) + can be executed directly on any runner.
- */
-public class ReplicateEvents {
+public class ReplicateSequences {
     // The log to output status messages to.
-    private static final Logger LOG = LoggerFactory.getLogger(ReplicateEvents.class);
-    private static final String appIdentifier = "Replicate_Events";
+    private static final Logger LOG = LoggerFactory.getLogger(ReplicateSequences.class);
+
+    // Pipeline configuration
+    private static final String appIdentifier = "Replicate_Sequences";
     private static final String contextualizationConfigKey = "enableContextualization";
     private static final String dataSetConfigKey = "enableDataSetMapping";
+    private static final String sequenceHeaderConfigKey = "sequenceHeaders";
+    private static final String sequenceRowsConfigKey = "sequenceRows";
 
     /**
-     * Create target event:
-     *         - Remove system fields (id, created date, last updated date)
-     *         - Translate the asset id links
-     *         - If the headers does not have externalId, use the source's id
-     *         - Map data set ids
+     * Create target sequence header
+     *     - Remove system fields (id, created time, last updated time)
+     *     - Translate the asset id links
+     *     - If the headers does not have externalId, us the source's id
+     *     - Map data set ids
      */
-    private static class PrepareEvents extends DoFn<Event, Event> {
+    private static class PrepareSequenceHeader extends DoFn<SequenceMetadata, SequenceMetadata> {
         PCollectionView<Map<String, String>> configMap;
         PCollectionView<Map<Long, String>> sourceAssetsIdMapView;
         PCollectionView<Map<String, Long>> targetAssetsIdMapView;
         PCollectionView<Map<Long, String>> sourceDataSetsIdMapView;
-        PCollectionView<Map<String, Long>> targetDataSetsExtIdMapView;
+        PCollectionView<Map<String, Long>> targetDataSetsIdMapView;
 
-        final Counter missingExtCounter = Metrics.counter(ReplicateEvents.PrepareEvents.class,
+        final Counter missingExtCounter = Metrics.counter(PrepareSequenceHeader.class,
                 "No external id");
-        final Counter assetMapCounter = Metrics.counter(ReplicateEvents.PrepareEvents.class,
+        final Counter assetMapCounter = Metrics.counter(PrepareSequenceHeader.class,
                 "Map asset ids");
-        final Counter dataSetMapCounter = Metrics.counter(ReplicateEvents.PrepareEvents.class,
+        final Counter dataSetMapCounter = Metrics.counter(PrepareSequenceHeader.class,
                 "Map data set");
 
-        PrepareEvents(PCollectionView<Map<String, String>> configMap,
-                      PCollectionView<Map<Long, String>> sourceAssetsIdMap,
-                      PCollectionView<Map<String, Long>> targetAssetsIdMap,
-                      PCollectionView<Map<Long, String>> sourceDataSetsIdMap,
-                      PCollectionView<Map<String, Long>> targetDataSetsExtIdMap) {
+        PrepareSequenceHeader(PCollectionView<Map<String, String>> configMap,
+                              PCollectionView<Map<Long, String>> sourceAssetsIdMapView,
+                              PCollectionView<Map<String, Long>> targetAssetsIdMapView,
+                              PCollectionView<Map<Long, String>> sourceDataSetsIdMapView,
+                              PCollectionView<Map<String, Long>> targetDataSetsIdMapView) {
             this.configMap = configMap;
-            this.sourceAssetsIdMapView = sourceAssetsIdMap;
-            this.targetAssetsIdMapView = targetAssetsIdMap;
-            this.sourceDataSetsIdMapView = sourceDataSetsIdMap;
-            this.targetDataSetsExtIdMapView = targetDataSetsExtIdMap;
+            this.sourceAssetsIdMapView = sourceAssetsIdMapView;
+            this.targetAssetsIdMapView = targetAssetsIdMapView;
+            this.sourceDataSetsIdMapView = sourceDataSetsIdMapView;
+            this.targetDataSetsIdMapView = targetDataSetsIdMapView;
         }
 
         @ProcessElement
-        public void processElement(@Element Event input,
-                                   OutputReceiver<Event> out,
+        public void processElement(@Element SequenceMetadata input,
+                                   OutputReceiver<SequenceMetadata> out,
                                    ProcessContext context) {
             Map<Long, String> sourceAssetsIdMap = context.sideInput(sourceAssetsIdMapView);
             Map<String, Long> targetAssetsIdMap = context.sideInput(targetAssetsIdMapView);
             Map<Long, String> sourceDataSetsIdMap = context.sideInput(sourceDataSetsIdMapView);
-            Map<String, Long> targetDataSetsExtIdMap = context.sideInput(targetDataSetsExtIdMapView);
+            Map<String, Long> targetDataSetsIdMap = context.sideInput((targetDataSetsIdMapView));
             Map<String, String> config = context.sideInput(configMap);
 
-            Event.Builder builder = input.toBuilder()
-                    .clearAssetIds()
+            SequenceMetadata.Builder builder = input.toBuilder()
+                    .clearAssetId()
                     .clearCreatedTime()
                     .clearLastUpdatedTime()
                     .clearId()
@@ -114,18 +108,17 @@ public class ReplicateEvents {
                 missingExtCounter.inc();
             }
 
-            // add asset link if enabled and it is available in the target
+            // add asset link if enabled and it is available in target
             if (config.getOrDefault(contextualizationConfigKey, "no").equalsIgnoreCase("yes")
-                    && input.getAssetIdsCount() > 0) {
-                for (long assetId : input.getAssetIdsList()) {
-                    // if the source asset has an externalId use it--if not, use the asset internal id
-                    String targetAssetExtId = sourceAssetsIdMap.getOrDefault(assetId, String.valueOf(assetId));
+                    && input.hasAssetId()) {
+                // if the source asset has an externalId use it--if not, use the asset internal id
+                String targetAssetExtId = sourceAssetsIdMap.getOrDefault(input.getAssetId().getValue(),
+                        String.valueOf(input.getAssetId().getValue()));
 
-                    if (targetAssetsIdMap.containsKey(targetAssetExtId)) {
-                        builder.addAssetIds(targetAssetsIdMap.get(targetAssetExtId));
-                    }
+                if (targetAssetsIdMap.containsKey(targetAssetExtId)) {
+                    builder.setAssetId(Int64Value.of(targetAssetsIdMap.get(targetAssetExtId)));
+                    assetMapCounter.inc();
                 }
-                if (builder.getAssetIdsCount() > 0) assetMapCounter.inc();
             }
 
             // map data set if enabled and it is available in the target
@@ -133,62 +126,22 @@ public class ReplicateEvents {
                     && input.hasDataSetId()) {
                 String targetDataSetExtId = sourceDataSetsIdMap.getOrDefault(
                         input.getDataSetId().getValue(), String.valueOf(input.getDataSetId().getValue()));
-                if (targetDataSetsExtIdMap.containsKey(targetDataSetExtId)) {
-                    builder.setDataSetId(Int64Value.of(targetDataSetsExtIdMap.get(targetDataSetExtId)));
+
+                if (targetDataSetsIdMap.containsKey(targetDataSetExtId)) {
+                    builder.setDataSetId(Int64Value.of(targetDataSetsIdMap.get(targetDataSetExtId)));
                     dataSetMapCounter.inc();
                 }
             }
 
-            // Check for constraint violations and correct the data
-            if (builder.getStartTime().getValue() < 0) {
-                builder.setStartTime(Int64Value.of(0L));
-                String message = "startTime was < 0. Setting startTime to 0L.";
-                builder.putMetadata("constraintViolationStartTime_b", message);
-                LOG.warn(message + " Event externalId: {}", builder.getExternalId().getValue());
-            }
-
-            if (builder.getEndTime().getValue() < 0) {
-                builder.setEndTime(Int64Value.of(builder.getStartTime().getValue()));
-                String message = "endTime was < 0. Set endTime to be equal to startTime";
-                builder.putMetadata("constraintViolationEndTime_b", message);
-                LOG.warn(message + " Event externalId: {}", builder.getExternalId().getValue());
-            }
-
-            if (builder.hasEndTime() && builder.hasStartTime()
-                        && builder.getStartTime().getValue() > builder.getEndTime().getValue()) {
-                builder.setStartTime(Int64Value.of(builder.getEndTime().getValue()));
-                String message = "startTime was greater than endTime. Changed startTime to be equal to endTime.";
-                builder.putMetadata("constraintViolationStartTime_b", message);
-                LOG.warn(message + " Event externalId: {}", builder.getExternalId().getValue());
-            }
-
-            if (builder.getDescription().getValue().length() > 500) {
-                builder.setDescription(StringValue.of(builder.getDescription().getValue().substring(0, 500)));
-                String message = "Description length was >500 characters. Truncated the description to the first 500 characters.";
-                builder.putMetadata("constraintViolationDescription", message);
-                LOG.warn(message + " Event externalId: {}", builder.getExternalId().getValue());
-            }
+            LOG.info("Data set map count: {}", dataSetMapCounter.toString());
+            LOG.info("Asset map count: {}", assetMapCounter.toString());
 
             out.output(builder.build());
         }
     }
 
-    /**
-     * Custom options for this pipeline.
-     */
-    public interface ReplicateEventsOptions extends PipelineOptions {
-        // The options below can be used for file-based secrets handling.
-        /*
-        @Description("The cdf source config file.The name should be in the format of gs://<bucket>/folder.")
-        @Validation.Required
-        ValueProvider<String> getCdfInputConfigFile();
-        void setCdfInputConfigFile(ValueProvider<String> value);
+    public interface ReplicateSequenceOptions extends PipelineOptions {
 
-        @Description("The cdf target config file. The name should be in the format of gs://<bucket>/folder.")
-        @Validation.Required
-        ValueProvider<String> getCdfOutputConfigFile();
-        void setCdfOutputConfigFile(ValueProvider<String> value);
-*/
         @Description("The GCP secret holding the source api key. The reference should be <projectId>.<secretId>.")
         @Validation.Required
         ValueProvider<String> getCdfInputSecret();
@@ -204,11 +157,6 @@ public class ReplicateEvents {
         ValueProvider<String> getCdfOutputSecret();
         void setCdfOutputSecret(ValueProvider<String> value);
 
-        @Description("The source delta read identifier. The default value is 'event-replicator'. Use a descriptive identifier.")
-        @Default.String("event-replicator")
-        ValueProvider<String> getDeltaIdentifier();
-        void setDeltaIdentifier(ValueProvider<String> value);
-
         @Description("The CDF target host name. The default value is https://api.cognitedata.com.")
         @Default.String("https://api.cognitedata.com")
         ValueProvider<String> getCdfOutputHost();
@@ -217,7 +165,7 @@ public class ReplicateEvents {
         /**
          * Specify the job configuration file.
          */
-        @Description("The job config file. The name should be in the format of gs://<bucket>/folder.")
+        @Description("The job config file. The name should be in the format of gs://<bucket>/folder/file.toml.")
         @Validation.Required
         ValueProvider<String> getJobConfigFile();
         void setJobConfigFile(ValueProvider<String> value);
@@ -233,19 +181,11 @@ public class ReplicateEvents {
         void setFullRead(ValueProvider<Boolean> value);
     }
 
-    /**
-     * Setup the main pipeline structure and run it:
-     * - Read the config settings
-     * - Read the assets from both source and target (in order to map the events' assets links)
-     * - Replicate the events.
-     *
-     * @param options
-     */
-    private static PipelineResult runReplicateEvents(ReplicateEventsOptions options) throws IOException {
+    private static PipelineResult runReplicateSequences(ReplicateSequenceOptions options) throws IOException {
         /*
         Build the project configuration (CDF tenant and api key) based on:
-        - api key from Secret Manager
-        - CDF api host
+        - API key from GCP Secret Manager
+        - CDF API host
          */
         GcpSecretConfig sourceSecret = GcpSecretConfig.of(
                 ValueProvider.NestedValueProvider.of(options.getCdfInputSecret(), secret -> secret.split("\\.")[0]),
@@ -262,10 +202,11 @@ public class ReplicateEvents {
 
         Pipeline p = Pipeline.create(options);
 
-       /*
+        /*
         Read the job config file and parse into views.
-        Config maps are published as views so they can be used by the transforms as side inputs.
+        Config maps are published as views so that they can be used by the transforms as side inputs.
          */
+
         PCollectionView<Map<String, String>> configMap = p
                 .apply("Read config map", ReadTomlStringMap.from(options.getJobConfigFile())
                         .withMapKey("config"))
@@ -276,22 +217,44 @@ public class ReplicateEvents {
                             return config;
                         })
                 )
-                .apply("to map view", View.asMap());
+                .apply("To map view", View.asMap());
 
         PCollectionView<List<String>> allowListDataSet = p
                 .apply("Read config allow list", ReadTomlStringArray.from(options.getJobConfigFile())
                         .withArrayKey("allowList.dataSetExternalId"))
-                .apply("Log data set extId", MapElements.into(TypeDescriptors.strings())
+                .apply("Log data set extId", MapElements
+                        .into(TypeDescriptors.strings())
                         .via(expression -> {
                             LOG.info("Registered dataSetExternalId: {}", expression);
                             return expression;
                         }))
-                .apply("To view", View.asList());
+                .apply("To list view", View.asList());
+
+        PCollectionView<List<String>> sequenceAllowList = p
+                .apply("Read sequence allow list", ReadTomlStringArray.from(options.getJobConfigFile())
+                        .withArrayKey("allowList.sequenceExternalId"))
+                .apply("Log sequence allow", MapElements.into(TypeDescriptors.strings())
+                        .via(expression -> {
+                            LOG.info("Registered sequence extId allow: {}", expression);
+                            return expression;
+                        }))
+                .apply("To list view", View.asList());
+
+        PCollectionView<List<String>> sequenceDenyList = p
+                .apply("Read sequence deny list", ReadTomlStringArray.from(options.getJobConfigFile())
+                        .withArrayKey("denyList.sequenceExternalId"))
+                .apply("Log sequence deny", MapElements.into(TypeDescriptors.strings())
+                        .via(expression -> {
+                            LOG.info("Registered sequence extId deny: {}", expression);
+                            return expression;
+                        }))
+                .apply("To list view", View.asList());
+
 
         /*
         Read the asset hierarchies from source and target. Shave off the metadata and use id + externalId
-        as the basis for mapping TS to assets. Project the resulting asset collections as views so they can be
-        used as side inputs to the main Event transform.
+        as the basis for mapping sequences to assets. Project the asset collections as views so that they can be
+        used as side inputs to the main File transform.
          */
         PCollectionView<Map<Long, String>> sourceAssetsIdMap = p
                 .apply("Read source assets", CogniteIO.readAssets()
@@ -305,7 +268,7 @@ public class ReplicateEvents {
                 .apply("Max per key", Max.perKey())
                 .apply("To map view", View.asMap());
 
-        PCollectionView<Map<String, Long>> targetAssetsIdMap = p
+        PCollectionView<Map<String, Long>> targetAssetsExtIdMap = p
                 .apply("Read target assets", CogniteIO.readAssets()
                         .withProjectConfig(targetConfig)
                         .withReaderConfig(ReaderConfig.create()
@@ -316,6 +279,7 @@ public class ReplicateEvents {
                         .via((Asset asset) -> KV.of(asset.getExternalId().getValue(), asset.getId().getValue())))
                 .apply("Max per key", Max.perKey())
                 .apply("To map view", View.asMap());
+
 
         /*
         Read the data sets from source and target. Will use these to map items from source data set to
@@ -330,13 +294,12 @@ public class ReplicateEvents {
                 .apply("Select id + externalId", MapElements
                         .into(TypeDescriptors.kvs(TypeDescriptors.longs(), TypeDescriptors.strings()))
                         .via((DataSet dataSet) -> {
-                                    LOG.info("Source dataset - id: {}, extId: {}, name: {}",
-                                            dataSet.getId().getValue(),
-                                            dataSet.getExternalId().getValue(),
-                                            dataSet.getName().getValue());
-                                    return KV.of(dataSet.getId().getValue(), dataSet.getExternalId().getValue());
-                                }
-                        ))
+                            LOG.info("Source dataset - id: {}, extId: {}, name: {}",
+                                    dataSet.getId().getValue(),
+                                    dataSet.getExternalId().getValue(),
+                                    dataSet.getName().getValue());
+                            return KV.of(dataSet.getId().getValue(), dataSet.getExternalId().getValue());
+                        }))
                 .apply("Max per key", Max.perKey())
                 .apply("To map view", View.asMap());
 
@@ -344,30 +307,20 @@ public class ReplicateEvents {
                 .apply("Read target data sets", CogniteIO.readDataSets()
                         .withProjectConfig(targetConfig)
                         .withReaderConfig(ReaderConfig.create()
-                                .withAppIdentifier(appIdentifier)
-                                .enableMetrics(false)))
-                .apply("Select externalId + id", MapElements
+                                .withAppIdentifier(appIdentifier).enableMetrics(false)))
+                .apply("Select external id + id", MapElements
                         .into(TypeDescriptors.kvs(TypeDescriptors.strings(), TypeDescriptors.longs()))
                         .via((DataSet dataSet) -> {
-                                    LOG.info("Target dataset - id: {}, extId: {}, name: {}",
-                                            dataSet.getId().getValue(),
-                                            dataSet.getExternalId().getValue(),
-                                            dataSet.getName().getValue());
-                                    return KV.of(dataSet.getExternalId().getValue(), dataSet.getId().getValue());
-                                }
-                        ))
+                            LOG.info("Target dataset - id: {}, extId: {}, name: {}",
+                                    dataSet.getId().getValue(),
+                                    dataSet.getExternalId().getValue(),
+                                    dataSet.getName().getValue());
+                            return KV.of(dataSet.getExternalId().getValue(), dataSet.getId().getValue());
+                        }))
                 .apply("Max per key", Max.perKey())
                 .apply("To map view", View.asMap());
 
-        /*
-        Read events from source and parse them:
-        - Filter on data set external id
-        - Remove system fields (id, created date, last updated date)
-        - Translate the asset id links (to be done)
-
-        Write the prepared events to target.
-         */
-        PCollection<Event> eventPCollection = p
+        PCollection<SequenceMetadata> sequenceHeaders = p
                 .apply("Build basic query", Create.of(RequestParameters.create()))
                 .apply("Add dataset filter", ParDo.of(new DoFn<RequestParameters, RequestParameters>() {
                     @ProcessElement
@@ -383,39 +336,114 @@ public class ReplicateEvents {
                             datasetExternalIds.add(ImmutableMap.of("externalId", extId));
                         }
 
-                        // Add filter for max lastUpdatedTime
-                        RequestParameters req = input
-                                .withFilterParameter("lastUpdatedTime", ImmutableMap.of(
-                                        "max", System.currentTimeMillis()));
-
                         if (datasetExternalIds.isEmpty() || allowList.contains("*")) {
                             LOG.info("Will not filter on data set external id");
-                            out.output(req);
+                            out.output(input);
                         } else {
                             LOG.info("Add filter on {} data set external ids.", datasetExternalIds.size());
-                            out.output(req
+                            out.output(input
                                     .withFilterParameter("dataSetIds", datasetExternalIds));
                         }
                     }
                 }).withSideInputs(allowListDataSet))
-                .apply("Read source events", CogniteIO.readAllEvents()
+                .apply("Read CDF Sequence headers", CogniteIO.readAllSequencesMetadata()
                         .withProjectConfig(sourceConfig)
-                        .withHints(Hints.create()
-                                .withReadShards(1000))
+                        .withReaderConfig(ReaderConfig.create()
+                                .withAppIdentifier(appIdentifier)))
+                .apply("Filter sequences", ParDo.of(new DoFn<SequenceMetadata, SequenceMetadata>() {
+                    @ProcessElement
+                    public void processElement(@Element SequenceMetadata input,
+                                               OutputReceiver<SequenceMetadata> out,
+                                               ProcessContext context) {
+                        List<String> denyList = context.sideInput(sequenceDenyList);
+                        List<String> allowList = context.sideInput(sequenceAllowList);
+
+                        // Check for deny list match
+                        if (!denyList.isEmpty() && input.hasExternalId()) {
+                            if (denyList.contains(input.getExternalId().getValue())) {
+                                LOG.debug("Deny list match {}. Sequence will be dropped.", input.getExternalId().getValue());
+                                return;
+                            }
+                        }
+
+                        // Check for allow list match
+                        if (allowList.contains("*")) {
+                            LOG.info("Allow all sequences");
+                            out.output(input);
+                            return;
+                        }
+                        if (allowList.contains(input.getExternalId().getValue())) {
+                            LOG.debug("Allow list match {}. Sequence will be included.", input.getExternalId().getValue());
+                            out.output(input);
+                        }
+                    }
+                }).withSideInputs(sequenceDenyList, sequenceAllowList));
+
+
+        /*
+        Create target Sequence Header and write:
+        - Check if config includes Sequence Headers
+        - Remove system fields (id, created date, last updated date)
+        - Translate the asset id links
+         */
+        PCollection<SequenceMetadata> output = sequenceHeaders
+                .apply("Include Sequence headers?", ParDo.of(new DoFn<SequenceMetadata, SequenceMetadata>() {
+                    @ProcessElement
+                    public void processElement(@Element SequenceMetadata input,
+                                               OutputReceiver<SequenceMetadata> out,
+                                               ProcessContext context) {
+                        Map<String, String> config = context.sideInput(configMap);
+                        if (config.getOrDefault(sequenceHeaderConfigKey, "no").equalsIgnoreCase("yes")) {
+                            out.output(input);
+                        }
+                    }
+                }).withSideInputs(configMap))
+                .apply("Process Sequence Headers", ParDo.of(new PrepareSequenceHeader(configMap, sourceAssetsIdMap,
+                        targetAssetsExtIdMap, sourceDataSetsIdMap, targetDataSetsExtIdMap))
+                        .withSideInputs(configMap, sourceAssetsIdMap, targetAssetsExtIdMap,
+                                sourceDataSetsIdMap, targetDataSetsExtIdMap))
+                .apply("Write Sequence Headers", CogniteIO.writeSequencesMetadata()
+                        .withProjectConfig(targetConfig)
+                        .withWriterConfig(WriterConfig.create()
+                                .withAppIdentifier(appIdentifier)
+                                .withUpsertMode(UpsertMode.REPLACE)));
+
+
+        /*
+        Read Sequence Rows for all headers
+        - Batch headers
+        - Check if config include rows
+        - Build the request to read the rows for each batch of headers.
+        - Process all read requests
+         */
+        PCollection<SequenceBody> sequenceBodies = sequenceHeaders
+                .apply("Map to read Sequence rows requests", MapElements
+                        .into(TypeDescriptor.of(RequestParameters.class))
+                        .via((SequenceMetadata input) -> {
+                            int limit = 10000;
+                            Map<String, Object> requestParameters = new HashMap<String, Object>();
+                            requestParameters.put("id", input.getId().getValue());
+                            return RequestParameters.create()
+                                    .withRequestParameters(requestParameters)
+                                    .withRootParameter("limit", limit);
+
+                        })
+                )
+                .apply("Read Sequence rows", CogniteIO.readAllSequenceRows()
+                        .withProjectConfig(sourceConfig)
                         .withReaderConfig(ReaderConfig.create()
                                 .withAppIdentifier(appIdentifier)
-                                .enableDeltaRead("system.replicator-delta-timestamp")
-                                .withDeltaIdentifier(options.getDeltaIdentifier())
-                                .withDeltaOffset(Duration.ofHours(2))
-                                .withFullReadOverride(options.getFullRead())))
-                .apply("Process events", ParDo.of(new PrepareEvents(configMap, sourceAssetsIdMap,
-                        targetAssetsIdMap, sourceDataSetsIdMap, targetDataSetsExtIdMap))
-                        .withSideInputs(configMap, sourceAssetsIdMap, targetAssetsIdMap,
-                                sourceDataSetsIdMap, targetDataSetsExtIdMap))
-                .apply("Write target events", CogniteIO.writeEvents()
+                        ));
+
+        /*
+        Write the Sequence Rows to the CDF target
+        - Process each row and convert into a row post object
+        - Write the row
+         */
+        sequenceBodies
+                .apply("Wait on: Write Sequence Headers", Wait.on(output))
+                .apply("Write Sequence Rows", CogniteIO.writeSequenceRows()
                         .withProjectConfig(targetConfig)
-                        .withHints(Hints.create()
-                                .withWriteShards(20))
                         .withWriterConfig(WriterConfig.create()
                                 .withAppIdentifier(appIdentifier)
                                 .withUpsertMode(UpsertMode.REPLACE)));
@@ -423,12 +451,10 @@ public class ReplicateEvents {
         return p.run();
     }
 
-    /**
-     * Read the pipeline options from args and run the pipeline.
-     * @param args
-     */
-    public static void main(String[] args) throws IOException{
-        ReplicateEventsOptions options = PipelineOptionsFactory.fromArgs(args).withValidation().as(ReplicateEventsOptions.class);
-        runReplicateEvents(options);
+    public static void main(String[] args) throws IOException {
+        ReplicateSequenceOptions options = PipelineOptionsFactory
+                .fromArgs(args).withValidation()
+                .as(ReplicateSequenceOptions.class);
+        runReplicateSequences(options);
     }
 }

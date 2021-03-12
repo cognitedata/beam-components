@@ -1,0 +1,15 @@
+# General config options
+[config]
+sequenceHeaders = "yes"         # synch sequence headers
+sequenceRows = "yes"            # synch sequences rows
+enableContextualization = "yes" # yes/no, try linking the Sequence headers to assets
+enableDataSetMapping = "yes"    # yes/no, try mapping the source data set to target data set
+
+# Filters specifying which time series to include in the replication
+# The exact match on externalId is unioned with the regex expression.
+# Example: "\\d" for digit, "\\\\" for backslash.
+[denyList]
+sequenceExternalId = []             # leave empty for no deny list
+[allowList]
+dataSetExternalId = ["*"]           # "*" includes all data sets
+sequenceExternalId = ["*"]          # include all sequences

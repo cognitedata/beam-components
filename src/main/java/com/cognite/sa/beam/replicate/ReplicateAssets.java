@@ -18,11 +18,12 @@ package com.cognite.sa.beam.replicate;
 
 import com.cognite.beam.io.CogniteIO;
 import com.cognite.beam.io.config.*;
-import com.cognite.beam.io.dto.Asset;
-import com.cognite.beam.io.dto.DataSet;
-import com.cognite.beam.io.servicesV1.RequestParameters;
+import com.cognite.client.dto.Asset;
+import com.cognite.client.dto.DataSet;
+import com.cognite.beam.io.RequestParameters;
 import com.cognite.beam.io.transform.toml.ReadTomlStringArray;
 import com.cognite.beam.io.transform.toml.ReadTomlStringMap;
+import com.cognite.client.config.UpsertMode;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.Int64Value;

@@ -22,9 +22,8 @@ import com.cognite.beam.io.config.GcpSecretConfig;
 import com.cognite.beam.io.config.Hints;
 import com.cognite.beam.io.config.ProjectConfig;
 import com.cognite.beam.io.config.ReaderConfig;
-import com.cognite.beam.io.dto.Asset;
-import com.cognite.beam.io.servicesV1.RequestParameters;
-import com.google.api.services.bigquery.model.Clustering;
+import com.cognite.client.dto.Asset;
+import com.cognite.beam.io.RequestParameters;
 import com.google.api.services.bigquery.model.TableFieldSchema;
 
 import com.google.api.services.bigquery.model.TableRow;
