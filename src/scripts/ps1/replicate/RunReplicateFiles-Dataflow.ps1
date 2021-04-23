@@ -41,15 +41,15 @@
 # file storage is supported. We recommend using GCS with the Dataflow runner.
 #--------------------------------------------------------------------
 #$tempStorageUri = 'gs://temp-bucket/temp-folder/'
-$tempStorageUri = 'gs://akerbp-temp/files-replicator-temp/'
+$tempStorageUri = 'gs://sa-dataflow-test/temp/'
 
 #---------------------------------------------------------------------
 # The job config file.
 #---------------------------------------------------------------------
 #$jobConfigFile = $gcpBucketPrefix + '-test/config/replicate/job-config-files-replication.toml'
-$jobConfigFile = $gcpBucketPrefix + '-test/config/replicate/job-config-files-replication-d2-lci.toml'
+$jobConfigFile = $gcpBucketPrefix + '-test/config/var/job-config-files-replication.toml'
 
-mvn compile exec:java -D exec.mainClass=com.cognite.sa.beam.replicate.ReplicateFiles -D exec.args="--cdfInputSecret=$cdfInputSecret --cdfInputHost=$cdfInputHost --cdfOutputSecret=$cdfOutputSecret --cdfOutputHost=$cdfOutputHost --jobConfigFile=$jobConfigFile --fullRead=$fullRead --tempStorageUri=$tempStorageUri --project=$gcpProject --runner=DataFlowRunner --gcpTempLocation=$gcpBucketPrefix-test/temp --stagingLocation=$gcpBucketPrefix-test/stage/replicate/replicate-files --region=europe-west1 --experiments=shuffle_mode=service --numWorkers=1 --maxNumWorkers=2 --experiments=enable_stackdriver_agent_metrics --workerMachineType=e2-standard-4"
+mvn compile exec:java -D exec.mainClass=com.cognite.sa.beam.replicate.ReplicateFiles -D exec.args="--cdfInputSecret=$cdfInputSecret --cdfInputHost=$cdfInputHost --cdfOutputSecret=$cdfOutputSecret --cdfOutputHost=$cdfOutputHost --jobConfigFile=$jobConfigFile --fullRead=$fullRead --tempStorageUri=$tempStorageUri --project=$gcpProject --runner=DataFlowRunner --gcpTempLocation=$gcpBucketPrefix-test/temp --stagingLocation=$gcpBucketPrefix-test/stage/replicate/replicate-files --region=europe-west1 --experiments=shuffle_mode=service --numWorkers=1 --maxNumWorkers=2 --experiments=enable_stackdriver_agent_metrics,enable_execution_details_collection,use_monitoring_state_manager --workerMachineType=e2-standard-4"
 
 # In order to add profiling:
 # --profilingAgentConfiguration='{\""APICurated\"" : true}'

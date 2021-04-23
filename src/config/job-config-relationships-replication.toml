@@ -1,0 +1,7 @@
+# General config options
+[config]
+enableDataSetMapping = "yes"    # yes/no, try mapping the source data set to target data set
+
+# Filters specifying which events to include in the replication
+[allowList]
+dataSetExternalId = ["*"]           # "*" includes all data sets
