@@ -142,7 +142,7 @@ public class ReplicateLabels {
                 .apply("Write target Labels", CogniteIO.writeLabels()
                         .withProjectConfig(targetConfig)
                         .withHints(Hints.create()
-                                .withWriteShards(20))
+                                .withWriteShards(2))
                         .withWriterConfig(WriterConfig.create()
                                 .withAppIdentifier(appIdentifier)
                                 .withUpsertMode(UpsertMode.REPLACE)));
