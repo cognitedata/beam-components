@@ -4,8 +4,7 @@ on:
   - push
 env:
   PROJECT_ID: cognite-inso-sandbox
-  GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
-
+  
 jobs:
   build:
     strategy:
@@ -26,19 +25,11 @@ jobs:
       - name: Build with Maven
         run: mvn --batch-mode --update-snapshots verify
 
-      - id: secrets
-        name: Access GCP secrets
-        uses: google-github-actions/get-secretmanager-secrets@v0.2.2
-        with:
-          credentials: ${{ secrets.GCP_SA_KEY }}
-          secrets: |-
-            sa-key:${{ env.PROJECT_ID }}/beam-components/latest
-
       - name: Login with specific service account
         uses: GoogleCloudPlatform/github-actions/setup-gcloud@v0.2.1
         with:
           project_id: ${{ env.PROJECT_ID }}
-          service_account_key: ${{ steps.secrets.outputs.sa-key }}
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
           export_default_credentials: true
 
       - name: Build and push image to Google Container Repository
