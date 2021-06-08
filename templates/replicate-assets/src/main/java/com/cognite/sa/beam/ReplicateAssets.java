@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-package com.cognite.sa.beam.replicate;
+package com.cognite.sa.beam;
 
 import com.cognite.beam.io.CogniteIO;
-import com.cognite.beam.io.config.*;
-import com.cognite.client.dto.Asset;
-import com.cognite.client.dto.DataSet;
 import com.cognite.beam.io.RequestParameters;
+import com.cognite.beam.io.config.*;
 import com.cognite.beam.io.transform.toml.ReadTomlStringArray;
 import com.cognite.beam.io.transform.toml.ReadTomlStringMap;
 import com.cognite.client.config.UpsertMode;
+import com.cognite.client.dto.Asset;
+import com.cognite.client.dto.DataSet;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.Int64Value;
@@ -34,21 +34,27 @@ import org.apache.beam.sdk.metrics.Counter;
 import org.apache.beam.sdk.metrics.Metrics;
 import org.apache.beam.sdk.options.*;
 import org.apache.beam.sdk.transforms.*;
-import org.apache.beam.sdk.values.*;
+import org.apache.beam.sdk.values.KV;
+import org.apache.beam.sdk.values.PCollectionTuple;
+import org.apache.beam.sdk.values.PCollectionView;
+import org.apache.beam.sdk.values.TypeDescriptors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * This pipeline reads assets from the specified cdf instance and writes them to a target cdf.
- *
+ * <p>
  * The assets will be synchronized via change detection between source and target. That is, the source will be considered
  * the "master" dataset and the target cdf instance will be updated to match it via upserts and deletes of assets.
- *
+ * <p>
  * This job is prepared to be deployed as a template on GCP (Dataflow) + can be executed directly on any runner.
  */
 public class ReplicateAssets {
@@ -59,10 +65,10 @@ public class ReplicateAssets {
 
     /**
      * Create target asset:
-     *         - Remove system fields (id, created date, last updated date, parentId)
-     *         - Translate the asset id links to externalParentId
-     *         - Set the key to the rootAssetExternalId
-     *         - Map data set ids.
+     * - Remove system fields (id, created date, last updated date, parentId)
+     * - Translate the asset id links to externalParentId
+     * - Set the key to the rootAssetExternalId
+     * - Map data set ids.
      */
     private static class PrepareAssets extends DoFn<Asset, KV<String, Asset>> {
         PCollectionView<Map<String, String>> configMap;
@@ -137,35 +143,41 @@ public class ReplicateAssets {
      */
     public interface ReplicateAssetsOptions extends PipelineOptions {
         // The options below can be used for file-based secrets handling.
-        /*
+
         @Description("The cdf source config file.The name should be in the format of gs://<bucket>/folder.")
         @Validation.Required
         ValueProvider<String> getCdfInputConfigFile();
+
         void setCdfInputConfigFile(ValueProvider<String> value);
 
         @Description("The cdf target config file. The name should be in the format of gs://<bucket>/folder.")
         @Validation.Required
         ValueProvider<String> getCdfOutputConfigFile();
+
         void setCdfOutputConfigFile(ValueProvider<String> value);
-*/
+
         @Description("The GCP secret holding the source api key. The reference should be <projectId>.<secretId>.")
         @Validation.Required
         ValueProvider<String> getCdfInputSecret();
+
         void setCdfInputSecret(ValueProvider<String> value);
 
         @Description("The CDF source host name. The default value is https://api.cognitedata.com.")
         @Default.String("https://api.cognitedata.com")
         ValueProvider<String> getCdfInputHost();
+
         void setCdfInputHost(ValueProvider<String> value);
 
         @Description("The GCP secret holding the target api key. The reference should be <projectId>.<secretId>.")
         @Validation.Required
         ValueProvider<String> getCdfOutputSecret();
+
         void setCdfOutputSecret(ValueProvider<String> value);
 
         @Description("The CDF target host name. The default value is https://api.cognitedata.com.")
         @Default.String("https://api.cognitedata.com")
         ValueProvider<String> getCdfOutputHost();
+
         void setCdfOutputHost(ValueProvider<String> value);
 
         /**
@@ -174,6 +186,7 @@ public class ReplicateAssets {
         @Description("The job config file. The name should be in the format of gs://<bucket>/folder.")
         @Validation.Required
         ValueProvider<String> getJobConfigFile();
+
         void setJobConfigFile(ValueProvider<String> value);
     }
 
@@ -186,23 +199,43 @@ public class ReplicateAssets {
      * @param options
      */
     private static PipelineResult runReplicateAssets(ReplicateAssetsOptions options) throws IOException {
-        /*
-        Build the project configuration (CDF tenant and api key) based on:
-        - api key from Secret Manager
-        - CDF api host
-         */
-        GcpSecretConfig sourceSecret = GcpSecretConfig.of(
-                ValueProvider.NestedValueProvider.of(options.getCdfInputSecret(), secret -> secret.split("\\.")[0]),
-                ValueProvider.NestedValueProvider.of(options.getCdfInputSecret(), secret -> secret.split("\\.")[1]));
-        ProjectConfig sourceConfig = ProjectConfig.create()
-                .withApiKeyFromGcpSecret(sourceSecret)
-                .withHost(options.getCdfInputHost());
-        GcpSecretConfig targetSecret = GcpSecretConfig.of(
-                ValueProvider.NestedValueProvider.of(options.getCdfOutputSecret(), secret -> secret.split("\\.")[0]),
-                ValueProvider.NestedValueProvider.of(options.getCdfOutputSecret(), secret -> secret.split("\\.")[1]));
-        ProjectConfig targetConfig = ProjectConfig.create()
-                .withApiKeyFromGcpSecret(targetSecret)
-                .withHost(options.getCdfOutputHost());
+
+        ProjectConfig sourceConfig = ProjectConfig.create();
+        ProjectConfig targetConfig = ProjectConfig.create();
+
+        if (options.getCdfInputConfigFile().isAccessible() &&
+                Objects.requireNonNull(options.getCdfInputConfigFile().get()).endsWith("yaml")) {
+            sourceConfig = sourceConfig.withYaml(Files.readString(Path.of(options.getCdfInputConfigFile().get())));
+        }
+
+        if (options.getCdfOutputConfigFile().isAccessible() &&
+                Objects.requireNonNull(options.getCdfOutputConfigFile().get()).endsWith("yaml")) {
+            targetConfig = targetConfig.withYaml(Files.readString(Path.of(options.getCdfOutputConfigFile().get())));
+        }
+
+        // Overwrite host if present explicitly
+        if (options.getCdfInputHost().isAccessible() && options.getCdfInputHost().get() != null) {
+            sourceConfig = sourceConfig.withHost(options.getCdfInputHost().get());
+        }
+
+        if (options.getCdfOutputHost().isAccessible() && options.getCdfOutputHost().get() != null) {
+            targetConfig = targetConfig.withHost(options.getCdfOutputHost().get());
+        }
+
+        // Overwrite API-KEYs if present explicitly in options
+        if (options.getCdfInputSecret().isAccessible() && options.getCdfInputSecret().get() != null) {
+            GcpSecretConfig sourceSecret = GcpSecretConfig.of(
+                    ValueProvider.NestedValueProvider.of(options.getCdfInputSecret(), secret -> secret.split("\\.")[0]),
+                    ValueProvider.NestedValueProvider.of(options.getCdfInputSecret(), secret -> secret.split("\\.")[1]));
+            sourceConfig = sourceConfig.withApiKeyFromGcpSecret(sourceSecret);
+        }
+
+        if (options.getCdfOutputSecret().isAccessible() && options.getCdfOutputSecret().get() != null) {
+            GcpSecretConfig targetSecret = GcpSecretConfig.of(
+                    ValueProvider.NestedValueProvider.of(options.getCdfOutputSecret(), secret -> secret.split("\\.")[0]),
+                    ValueProvider.NestedValueProvider.of(options.getCdfOutputSecret(), secret -> secret.split("\\.")[1]));
+            targetConfig = targetConfig.withApiKeyFromGcpSecret(targetSecret);
+        }
 
         Pipeline p = Pipeline.create(options);
 
@@ -283,13 +316,13 @@ public class ReplicateAssets {
                 .apply("Select id + externalId", MapElements
                         .into(TypeDescriptors.kvs(TypeDescriptors.longs(), TypeDescriptors.strings()))
                         .via((DataSet dataSet) -> {
-                            LOG.info("Source dataset - id: {}, extId: {}, name: {}",
-                                    dataSet.getId().getValue(),
-                                    dataSet.getExternalId().getValue(),
-                                    dataSet.getName().getValue());
-                            return KV.of(dataSet.getId().getValue(), dataSet.getExternalId().getValue());
+                                    LOG.info("Source dataset - id: {}, extId: {}, name: {}",
+                                            dataSet.getId().getValue(),
+                                            dataSet.getExternalId().getValue(),
+                                            dataSet.getName().getValue());
+                                    return KV.of(dataSet.getId().getValue(), dataSet.getExternalId().getValue());
                                 }
-                                ))
+                        ))
                 .apply("Max per key", Max.perKey())
                 .apply("To map view", View.asMap());
 
@@ -303,13 +336,13 @@ public class ReplicateAssets {
                 .apply("Select externalId + id", MapElements
                         .into(TypeDescriptors.kvs(TypeDescriptors.strings(), TypeDescriptors.longs()))
                         .via((DataSet dataSet) -> {
-                            LOG.info("Target dataset - id: {}, extId: {}, name: {}",
-                                    dataSet.getId().getValue(),
-                                    dataSet.getExternalId().getValue(),
-                                    dataSet.getName().getValue());
-                            return KV.of(dataSet.getExternalId().getValue(), dataSet.getId().getValue());
+                                    LOG.info("Target dataset - id: {}, extId: {}, name: {}",
+                                            dataSet.getId().getValue(),
+                                            dataSet.getExternalId().getValue(),
+                                            dataSet.getName().getValue());
+                                    return KV.of(dataSet.getExternalId().getValue(), dataSet.getId().getValue());
                                 }
-                                ))
+                        ))
                 .apply("Max per key", Max.perKey())
                 .apply("To map view", View.asMap());
 
@@ -395,9 +428,10 @@ public class ReplicateAssets {
 
     /**
      * Read the pipeline options from args and run the pipeline.
+     *
      * @param args
      */
-    public static void main(String[] args) throws IOException{
+    public static void main(String[] args) throws IOException {
         ReplicateAssetsOptions options = PipelineOptionsFactory.fromArgs(args).withValidation().as(ReplicateAssetsOptions.class);
         runReplicateAssets(options);
     }

@@ -2,9 +2,16 @@ name: Java CI
 
 on:
   - push
-
+env:
+  PROJECT_ID: cognite-inso-sandbox
+  
 jobs:
   build:
+    strategy:
+      matrix:
+        module:
+          - replicate-assets
+
     runs-on: ubuntu-latest
 
     steps:
@@ -17,3 +24,23 @@ jobs:
 
       - name: Build with Maven
         run: mvn --batch-mode --update-snapshots verify
+
+      - name: Login with specific service account
+        uses: GoogleCloudPlatform/github-actions/setup-gcloud@v0.2.1
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          export_default_credentials: true
+
+      - name: Build and push image to Google Container Repository
+        env:
+          TARGET_GCR_IMAGE: eu.gcr.io/${{ env.PROJECT_ID }}/${{ matrix.module }}
+          BASE_CONTAINER_IMAGE: gcr.io/dataflow-templates-base/java11-template-launcher-base
+          BASE_CONTAINER_IMAGE_VERSION: latest
+          APP_ROOT: /template/${{ matrix.module }}
+        run: mvn clean package -Dimage=${TARGET_GCR_IMAGE} \
+          -Dbase-container-image=${BASE_CONTAINER_IMAGE} \
+          -Dbase-container-image.version=${BASE_CONTAINER_IMAGE_VERSION} \
+          -Dapp-root=${APP_ROOT} \
+          -Dcommand-spec=${APP_ROOT}/resources/${{ matrix.module }}-command-spec.json \
+          -am -pl templates/${{ matrix.module }}
