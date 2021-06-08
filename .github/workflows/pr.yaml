@@ -2,6 +2,10 @@ name: Java CI
 
 on:
   - push
+env:
+  PROJECT_ID: cognite-inso-sandbox
+  GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+  TEMPLATE_MODULE: beam-components
 
 jobs:
   build:
@@ -17,3 +21,32 @@ jobs:
 
       - name: Build with Maven
         run: mvn --batch-mode --update-snapshots verify
+
+      - id: secrets
+        name: Access GCP secrets
+        uses: google-github-actions/get-secretmanager-secrets@v0.2.2
+        with:
+          credentials: ${{ secrets.GCP_SA_KEY }}
+          secrets: |-
+            sa-key:${{ env.PROJECT_ID }}/beam-components/latest
+
+      - name: Login with specific service account
+        uses: GoogleCloudPlatform/github-actions/setup-gcloud@v0.2.1
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+          service_account_key: ${{ steps.secrets.outputs.sa-key }}
+          export_default_credentials: true
+
+      - name: Build and push image to Google Container Repository
+        env:
+          TARGET_GCR_IMAGE: eu.gcr.io/${{ env.PROJECT_ID }}/${{ env.TEMPLATE_MODULE }}
+          BASE_CONTAINER_IMAGE: gcr.io/dataflow-templates-base/java11-template-launcher-base
+          BASE_CONTAINER_IMAGE_VERSION: latest
+          APP_ROOT: /template/${{ env.TEMPLATE_MODULE }}
+          COMMAND_SPEC: /template/${{ env.TEMPLATE_MODULE }}/resources/${{ env.TEMPLATE_MODULE }}-command-spec.json
+        run: mvn clean package -Dimage=${TARGET_GCR_IMAGE} \
+          -Dbase-container-image=${BASE_CONTAINER_IMAGE} \
+          -Dbase-container-image.version=${BASE_CONTAINER_IMAGE_VERSION} \
+          -Dapp-root=${APP_ROOT} \
+          -Dcommand-spec=${COMMAND_SPEC} \
+          -am -pl ${{ env.TEMPLATE_MODULE }}

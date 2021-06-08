@@ -1,0 +1,9 @@
+{
+  "mainClass": "com.cognite.sa.beam.ReplicateAssets",
+  "classPath": "/template/replicate-assets/*:/template/replicate-assets/libs/*:/template/replicate-assets/classes",
+  "defaultParameterValues": {
+    "labels": "{\"goog-dataflow-provided-template-type\":\"flex\",\"goog-dataflow-provided-template-name\":\"replicate-assets\"}",
+    "autoscalingAlgorithm": "THROUGHPUT_BASED",
+    "maxNumWorkers": "10"
+  }
+}

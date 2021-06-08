@@ -26,7 +26,6 @@ import com.cognite.client.dto.DataSet;
 import com.cognite.client.dto.Relationship;
 import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.Int64Value;
-import com.google.protobuf.StringValue;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.metrics.Counter;
@@ -41,7 +40,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
