@@ -5,10 +5,14 @@ on:
 env:
   PROJECT_ID: cognite-inso-sandbox
   GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
-  TEMPLATE_MODULE: beam-components
 
 jobs:
   build:
+    strategy:
+      matrix:
+        module:
+          - replicate-assets
+
     runs-on: ubuntu-latest
 
     steps:
@@ -39,14 +43,13 @@ jobs:
 
       - name: Build and push image to Google Container Repository
         env:
-          TARGET_GCR_IMAGE: eu.gcr.io/${{ env.PROJECT_ID }}/${{ env.TEMPLATE_MODULE }}
+          TARGET_GCR_IMAGE: eu.gcr.io/${{ env.PROJECT_ID }}/${{ matrix.module }}
           BASE_CONTAINER_IMAGE: gcr.io/dataflow-templates-base/java11-template-launcher-base
           BASE_CONTAINER_IMAGE_VERSION: latest
-          APP_ROOT: /template/${{ env.TEMPLATE_MODULE }}
-          COMMAND_SPEC: /template/${{ env.TEMPLATE_MODULE }}/resources/${{ env.TEMPLATE_MODULE }}-command-spec.json
+          APP_ROOT: /template/${{ matrix.module }}
         run: mvn clean package -Dimage=${TARGET_GCR_IMAGE} \
           -Dbase-container-image=${BASE_CONTAINER_IMAGE} \
           -Dbase-container-image.version=${BASE_CONTAINER_IMAGE_VERSION} \
           -Dapp-root=${APP_ROOT} \
-          -Dcommand-spec=${COMMAND_SPEC} \
-          -am -pl ${{ env.TEMPLATE_MODULE }}
+          -Dcommand-spec=${APP_ROOT}/resources/${{ matrix.module }}-command-spec.json \
+          -am -pl templates/${{ matrix.module }}
