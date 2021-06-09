@@ -1,5 +1,5 @@
 # The gcp project name
-$gcpProject = 'your-gcp-project-name'
+$gcpProject = 'akerbp-eureka-sa-sandbox'
 
 # The gcp bucket prefix for dataflow artifacts
-$gcpBucketPrefix = 'gs://identifier-dataflow'
+$gcpBucketPrefix = 'gs://akerbp-dataflow'
