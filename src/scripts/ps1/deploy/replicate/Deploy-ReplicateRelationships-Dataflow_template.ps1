@@ -1,7 +1,7 @@
 . $PSScriptRoot'\..\..\variables.ps1'
 . $PSScriptRoot'\..\base-config.ps1'
 $postfix = Get-Postfix
-$postfix = ''
+
 # Default variable values are picked up from the above files.
 # You can override them with local variable definitions in this file.
 #

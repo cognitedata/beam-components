@@ -9,14 +9,10 @@
 #-------------------------------------------------------------------
 #$cdfInputSecret = 'projectId.secretId'
 #$cdfOutputSecret = 'projectId.secretId'
-$cdfInputSecret = '719303257135.pgs-migration-source-project'
-$cdfOutputSecret = '719303257135.pgs-migration-dest'
-#$cdfInputSecret = '223824617234.svc-noc-pre-prod-replicator'
-#$cdfOutputSecret = '223824617234.svc-noc-azure-dev'
 
 # The CDF host
 $cdfInputHost = 'https://api.cognitedata.com'
-$cdfOutputHost = 'https://pgs.cognitedata.com'
+$cdfOutputHost = 'https://api.cognitedata.com'
 
 # Delta read override
 $fullRead = 'true'
