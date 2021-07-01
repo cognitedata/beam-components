@@ -48,7 +48,7 @@ import java.util.Map;
 
 public class ReplicateFilesMetadata {
     // The log to output status messages to.
-    private static final Logger LOG = LoggerFactory.getLogger(ReplicateFiles.class);
+    private static final Logger LOG = LoggerFactory.getLogger(ReplicateFilesMetadata.class);
     private static final String appIdentifier = "Replicate_Files";
     private static final String contextualizationConfigKey = "enableContextualization";
     private static final String dataSetConfigKey = "enableDataSetMapping";
