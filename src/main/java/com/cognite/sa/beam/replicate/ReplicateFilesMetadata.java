@@ -68,6 +68,8 @@ public class ReplicateFilesMetadata {
                 "Asset ids not mapped");
         final Counter dataSetMapCounter = Metrics.counter(PrepareFilesMetadata.class,
                 "Data set mapped");
+        final Counter noDataSetMapCounter = Metrics.counter(PrepareFilesMetadata.class,
+                "Data set not mapped");
 
         public PrepareFilesMetadata(PCollectionView<Map<String, String>> configMap,
                             PCollectionView<Map<Long, String>> sourceAssetsIdMapView,
@@ -98,15 +100,15 @@ public class ReplicateFilesMetadata {
                     .clearLastUpdatedTime()
                     .clearDataSetId();
 
-            if (!fileMetadataBuilder.hasExternalId()) {
+            if (!input.hasExternalId()) {
                 fileMetadataBuilder.setExternalId(StringValue.of(String.valueOf(fileMetadataBuilder.getId().getValue())));
                 missingExtIdCounter.inc();
             }
 
             // Add asset link if enabled and it is available on the target
             if (config.getOrDefault(contextualizationConfigKey, "no").equalsIgnoreCase("yes")
-                    && fileMetadataBuilder.getAssetIdsCount() > 0) {
-                for (Long assetId : fileMetadataBuilder.getAssetIdsList()) {
+                    && input.getAssetIdsCount() > 0) {
+                for (Long assetId : input.getAssetIdsList()) {
                     // If the source asset has an externalId, use it -- if not, use the asset internal id
                     String targetAssetExtId = sourceAssetsIdMap.getOrDefault(assetId, String.valueOf(assetId));
 
@@ -123,14 +125,18 @@ public class ReplicateFilesMetadata {
 
             // Map data set if enabled and it is available on the target
             if(config.getOrDefault(dataSetConfigKey, "no").equalsIgnoreCase("yes")
-                    && fileMetadataBuilder.hasDataSetId()) {
+                    && input.hasDataSetId()) {
                 String targetDataSetExtId = sourceDataSetsIdMap.getOrDefault(
-                        fileMetadataBuilder.getDataSetId().getValue(),
-                        String.valueOf(fileMetadataBuilder.getDataSetId().getValue()));
+                        input.getDataSetId().getValue(),
+                        String.valueOf(input.getDataSetId().getValue()));
 
                 if (targetDataSetsExtIdMap.containsKey(targetDataSetExtId)) {
                     fileMetadataBuilder.setDataSetId(Int64Value.of(targetDataSetsExtIdMap.get(targetDataSetExtId)));
                     dataSetMapCounter.inc();
+                } else {
+                    noDataSetMapCounter.inc();
+                    LOG.warn("Could not map data set for source file id = [{}]",
+                            input.getId().getValue());
                 }
             }
 
