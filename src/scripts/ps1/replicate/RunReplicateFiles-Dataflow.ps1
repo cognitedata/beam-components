@@ -40,12 +40,14 @@
 # Temporary storage area for large files (>200MiB). Currently GCS and local
 # file storage is supported. We recommend using GCS with the Dataflow runner.
 #--------------------------------------------------------------------
-$tempStorageUri = 'gs://temp-bucket/temp-folder/'
+#$tempStorageUri = 'gs://temp-bucket/temp-folder/'
+$tempStorageUri = 'gs://akerbp-temp/files-replicator-temp/'
 
 #---------------------------------------------------------------------
 # The job config file.
 #---------------------------------------------------------------------
-$jobConfigFile = $gcpBucketPrefix + '-test/config/replicate/job-config-files-replication.toml'
+#$jobConfigFile = $gcpBucketPrefix + '-test/config/replicate/job-config-files-replication.toml'
+$jobConfigFile = $gcpBucketPrefix + '-test/config/replicate/job-config-files-replication-d2-lci-files-prod2dev.toml'
 
 mvn compile exec:java -D exec.mainClass=com.cognite.sa.beam.replicate.ReplicateFiles -D exec.args="--cdfInputSecret=$cdfInputSecret --cdfInputHost=$cdfInputHost --cdfOutputSecret=$cdfOutputSecret --cdfOutputHost=$cdfOutputHost --jobConfigFile=$jobConfigFile --fullRead=$fullRead --tempStorageUri=$tempStorageUri --project=$gcpProject --runner=DataFlowRunner --gcpTempLocation=$gcpBucketPrefix-test/temp --stagingLocation=$gcpBucketPrefix-test/stage/replicate/replicate-files --region=europe-west1 --experiments=shuffle_mode=service --numWorkers=1 --maxNumWorkers=2 --experiments=enable_stackdriver_agent_metrics,enable_execution_details_collection,use_monitoring_state_manager --workerMachineType=e2-standard-4"
 

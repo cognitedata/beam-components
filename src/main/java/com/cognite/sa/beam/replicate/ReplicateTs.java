@@ -81,7 +81,7 @@ public class ReplicateTs {
                 TimeseriesPointPost.Builder builder = TimeseriesPointPost.newBuilder()
                         .setTimestamp(inputPoint.getTimestamp());
                 if (inputPoint.hasExternalId()) {
-                    builder.setExternalId(inputPoint.getExternalId().getValue());
+                    builder.setExternalId(inputPoint.getExternalId());
                 } else {
                     builder.setExternalId(String.valueOf(inputPoint.getId()));
                 }
@@ -169,7 +169,7 @@ public class ReplicateTs {
                     .clearDataSetId();
 
             if (!input.hasExternalId()) {
-                builder.setExternalId(StringValue.of(String.valueOf(input.getId().getValue())));
+                builder.setExternalId(String.valueOf(input.getId()));
                 missingExtCounter.inc();
             }
 
@@ -177,11 +177,11 @@ public class ReplicateTs {
             if (config.getOrDefault(contextualizationConfigKey, "no").equalsIgnoreCase("yes")
                     && input.hasAssetId()) {
                 // if the source asset has an externalId use it--if not, use the asset internal id
-                String targetAssetExtId = sourceAssetsIdMap.getOrDefault(input.getAssetId().getValue(),
-                        String.valueOf(input.getAssetId().getValue()));
+                String targetAssetExtId = sourceAssetsIdMap.getOrDefault(input.getAssetId(),
+                        String.valueOf(input.getAssetId()));
 
                 if (targetAssetsIdMap.containsKey(targetAssetExtId)) {
-                    builder.setAssetId(Int64Value.of(targetAssetsIdMap.get(targetAssetExtId)));
+                    builder.setAssetId(targetAssetsIdMap.get(targetAssetExtId));
                     assetMapCounter.inc();
                 }
             }
@@ -190,9 +190,9 @@ public class ReplicateTs {
             if (config.getOrDefault(dataSetConfigKey, "no").equalsIgnoreCase("yes")
                     && input.hasDataSetId()) {
                 String targetDataSetExtId = sourceDataSetsIdMap.getOrDefault(
-                        input.getDataSetId().getValue(), String.valueOf(input.getDataSetId().getValue()));
+                        input.getDataSetId(), String.valueOf(input.getDataSetId()));
                 if (targetDataSetsExtIdMap.containsKey(targetDataSetExtId)) {
-                    builder.setDataSetId(Int64Value.of(targetDataSetsExtIdMap.get(targetDataSetExtId)));
+                    builder.setDataSetId(targetDataSetsExtIdMap.get(targetDataSetExtId));
                     dataSetMapCounter.inc();
                 }
             }
@@ -350,7 +350,7 @@ public class ReplicateTs {
                                 .enableMetrics(false)))
                 .apply("Extract id + externalId", MapElements
                         .into(TypeDescriptors.kvs(TypeDescriptors.longs(), TypeDescriptors.strings()))
-                        .via((Asset asset) -> KV.of(asset.getId().getValue(), asset.getExternalId().getValue())))
+                        .via((Asset asset) -> KV.of(asset.getId(), asset.getExternalId())))
                 .apply("Max per key", Max.perKey())
                 .apply("To map view", View.asMap());
 
@@ -362,7 +362,7 @@ public class ReplicateTs {
                                 .enableMetrics(false)))
                 .apply("Extract externalId + id", MapElements
                         .into(TypeDescriptors.kvs(TypeDescriptors.strings(), TypeDescriptors.longs()))
-                        .via((Asset asset) -> KV.of(asset.getExternalId().getValue(), asset.getId().getValue())))
+                        .via((Asset asset) -> KV.of(asset.getExternalId(), asset.getId())))
                 .apply("Max per key", Max.perKey())
                 .apply("To map view", View.asMap());
 
@@ -380,10 +380,10 @@ public class ReplicateTs {
                         .into(TypeDescriptors.kvs(TypeDescriptors.longs(), TypeDescriptors.strings()))
                         .via((DataSet dataSet) -> {
                                     LOG.info("Source dataset - id: {}, extId: {}, name: {}",
-                                            dataSet.getId().getValue(),
-                                            dataSet.getExternalId().getValue(),
-                                            dataSet.getName().getValue());
-                                    return KV.of(dataSet.getId().getValue(), dataSet.getExternalId().getValue());
+                                            dataSet.getId(),
+                                            dataSet.getExternalId(),
+                                            dataSet.getName());
+                                    return KV.of(dataSet.getId(), dataSet.getExternalId());
                                 }
                         ))
                 .apply("Max per key", Max.perKey())
@@ -399,10 +399,10 @@ public class ReplicateTs {
                         .into(TypeDescriptors.kvs(TypeDescriptors.strings(), TypeDescriptors.longs()))
                         .via((DataSet dataSet) -> {
                                     LOG.info("Target dataset - id: {}, extId: {}, name: {}",
-                                            dataSet.getId().getValue(),
-                                            dataSet.getExternalId().getValue(),
-                                            dataSet.getName().getValue());
-                                    return KV.of(dataSet.getExternalId().getValue(), dataSet.getId().getValue());
+                                            dataSet.getId(),
+                                            dataSet.getExternalId(),
+                                            dataSet.getName());
+                                    return KV.of(dataSet.getExternalId(), dataSet.getId());
                                 }
                         ))
                 .apply("Max per key", Max.perKey())
@@ -462,18 +462,18 @@ public class ReplicateTs {
 
                         // Check for deny list match
                         if (!denyList.isEmpty() && input.hasExternalId()) {
-                            if (denyList.contains(input.getExternalId().getValue())) {
-                                LOG.debug("Deny list match {}. TS will be dropped.", input.getExternalId().getValue());
+                            if (denyList.contains(input.getExternalId())) {
+                                LOG.debug("Deny list match {}. TS will be dropped.", input.getExternalId());
                                 return;
                             }
                         }
 
                         if (!denyListRegEx.isEmpty() && input.hasExternalId()) {
                             for (String regExString : denyListRegEx) {
-                                if (Pattern.matches(regExString, input.getExternalId().getValue())) {
+                                if (Pattern.matches(regExString, input.getExternalId())) {
                                     LOG.debug("Deny list regEx {} match externalId {}. TS will be dropped.",
                                             regExString,
-                                            input.getExternalId().getValue());
+                                            input.getExternalId());
                                     return;
                                 }
                             }
@@ -485,18 +485,18 @@ public class ReplicateTs {
                             return;
                         }
 
-                        if (allowList.contains(input.getExternalId().getValue())) {
-                            LOG.debug("Allow list match {}. TS will be included.", input.getExternalId().getValue());
+                        if (allowList.contains(input.getExternalId())) {
+                            LOG.debug("Allow list match {}. TS will be included.", input.getExternalId());
                             out.output(input);
                             return;
                         }
 
                         if (!allowListRegEx.isEmpty() && input.hasExternalId()) {
                             for (String regExString : allowListRegEx) {
-                                if (Pattern.matches(regExString, input.getExternalId().getValue())) {
+                                if (Pattern.matches(regExString, input.getExternalId())) {
                                     LOG.debug("Allow list regEx {} match externalId {}. TS will be included.",
                                             regExString,
-                                            input.getExternalId().getValue());
+                                            input.getExternalId());
                                 }
                                 out.output(input);
                                 return;
@@ -557,7 +557,7 @@ public class ReplicateTs {
                         Map<String, String> config = context.sideInput(configMap);
                         List<Map<String, Object>> items = new ArrayList<>();
                         for (TimeseriesMetadata ts : input) {
-                            items.add(ImmutableMap.of("id", ts.getId().getValue()));
+                            items.add(ImmutableMap.of("id", ts.getId()));
                         }
 
                         Instant fromTime = Instant.now().truncatedTo(ChronoUnit.DAYS); //default

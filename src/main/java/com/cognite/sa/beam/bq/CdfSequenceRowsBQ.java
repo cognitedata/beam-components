@@ -105,7 +105,7 @@ public class CdfSequenceRowsBQ {
                         .via((SequenceMetadata input) -> {
                             int limit = 10000;
                             Map<String, Object> requestParameters = new HashMap<String, Object>();
-                            requestParameters.put("id", input.getId().getValue());
+                            requestParameters.put("id", input.getId());
                             return RequestParameters.create()
                                     .withRequestParameters(requestParameters)
                                     .withRootParameter("limit", limit);
@@ -169,7 +169,7 @@ public class CdfSequenceRowsBQ {
                     }
 
                     return new TableRow()
-                            .set("seq_external_id", element.hasExternalId() ? element.getExternalId().getValue() : null)
+                            .set("seq_external_id", element.hasExternalId() ? element.getExternalId() : null)
                             .set("row_number", row.getRowNumber())
                             .set("rows", rows)
                             .set("row_updated_time", formatter.format(Instant.now()));

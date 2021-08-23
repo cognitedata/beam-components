@@ -101,7 +101,7 @@ public class ReplicateFilesMetadata {
                     .clearDataSetId();
 
             if (!input.hasExternalId()) {
-                fileMetadataBuilder.setExternalId(StringValue.of(String.valueOf(fileMetadataBuilder.getId().getValue())));
+                fileMetadataBuilder.setExternalId(String.valueOf(fileMetadataBuilder.getId()));
                 missingExtIdCounter.inc();
             }
 
@@ -127,16 +127,16 @@ public class ReplicateFilesMetadata {
             if(config.getOrDefault(dataSetConfigKey, "no").equalsIgnoreCase("yes")
                     && input.hasDataSetId()) {
                 String targetDataSetExtId = sourceDataSetsIdMap.getOrDefault(
-                        input.getDataSetId().getValue(),
-                        String.valueOf(input.getDataSetId().getValue()));
+                        input.getDataSetId(),
+                        String.valueOf(input.getDataSetId()));
 
                 if (targetDataSetsExtIdMap.containsKey(targetDataSetExtId)) {
-                    fileMetadataBuilder.setDataSetId(Int64Value.of(targetDataSetsExtIdMap.get(targetDataSetExtId)));
+                    fileMetadataBuilder.setDataSetId(targetDataSetsExtIdMap.get(targetDataSetExtId));
                     dataSetMapCounter.inc();
                 } else {
                     noDataSetMapCounter.inc();
                     LOG.warn("Could not map data set for source file id = [{}]",
-                            input.getId().getValue());
+                            input.getId());
                 }
             }
 
@@ -253,7 +253,7 @@ public class ReplicateFilesMetadata {
                                 .enableMetrics(false)))
                 .apply("Extract id + externalId", MapElements
                         .into(TypeDescriptors.kvs(TypeDescriptors.longs(), TypeDescriptors.strings()))
-                        .via((Asset asset) -> KV.of(asset.getId().getValue(), asset.getExternalId().getValue())))
+                        .via((Asset asset) -> KV.of(asset.getId(), asset.getExternalId())))
                 .apply("Max per key", Max.perKey())
                 .apply("To map view", View.asMap());
 
@@ -265,7 +265,7 @@ public class ReplicateFilesMetadata {
                                 .enableMetrics(false)))
                 .apply("Extract externalId + id", MapElements
                         .into(TypeDescriptors.kvs(TypeDescriptors.strings(), TypeDescriptors.longs()))
-                        .via((Asset asset) -> KV.of(asset.getExternalId().getValue(), asset.getId().getValue())))
+                        .via((Asset asset) -> KV.of(asset.getExternalId(), asset.getId())))
                 .apply("Max per key", Max.perKey())
                 .apply("To map view", View.asMap());
 
@@ -284,10 +284,10 @@ public class ReplicateFilesMetadata {
                         .into(TypeDescriptors.kvs(TypeDescriptors.longs(), TypeDescriptors.strings()))
                         .via((DataSet dataSet) -> {
                             LOG.info("Source dataset - id: {}, extId: {}, name: {}",
-                                    dataSet.getId().getValue(),
-                                    dataSet.getExternalId().getValue(),
-                                    dataSet.getName().getValue());
-                            return KV.of(dataSet.getId().getValue(), dataSet.getExternalId().getValue());
+                                    dataSet.getId(),
+                                    dataSet.getExternalId(),
+                                    dataSet.getName());
+                            return KV.of(dataSet.getId(), dataSet.getExternalId());
                         }))
                 .apply("Max per key", Max.perKey())
                 .apply("To map view", View.asMap());
@@ -301,10 +301,10 @@ public class ReplicateFilesMetadata {
                         .into(TypeDescriptors.kvs(TypeDescriptors.strings(), TypeDescriptors.longs()))
                         .via((DataSet dataSet) -> {
                             LOG.info("Target dataset - id: {}, extId: {}, name: {}",
-                                    dataSet.getId().getValue(),
-                                    dataSet.getExternalId().getValue(),
-                                    dataSet.getName().getValue());
-                            return KV.of(dataSet.getExternalId().getValue(), dataSet.getId().getValue());
+                                    dataSet.getId(),
+                                    dataSet.getExternalId(),
+                                    dataSet.getName());
+                            return KV.of(dataSet.getExternalId(), dataSet.getId());
                         }))
                 .apply("Max per key", Max.perKey())
                 .apply("To map view", View.asMap());

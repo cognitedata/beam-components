@@ -139,24 +139,24 @@ public class CdfSequenceHeaderBQ {
 
                     for (SequenceColumn col : element.getColumnsList()) {
                         columns.add(new TableRow()
-                                .set("name", col.hasName() ? col.getName().getValue() : null)
+                                .set("name", col.hasName() ? col.getName() : null)
                                 .set("external_id", col.getExternalId())
                                 .set("value_type", SequenceParser.toString(col.getValueType())));
                     }
 
                     return new TableRow()
-                            .set("id", element.hasId() ? element.getId().getValue() : null)
-                            .set("name", element.hasName() ? element.getName().getValue() : null)
-                            .set("description", element.hasDescription() ? element.getDescription().getValue() : null)
-                            .set("asset_id", element.hasAssetId() ? element.getAssetId().getValue() : null)
-                            .set("external_id", element.hasExternalId() ? element.getExternalId().getValue() : null)
+                            .set("id", element.hasId() ? element.getId() : null)
+                            .set("name", element.hasName() ? element.getName() : null)
+                            .set("description", element.hasDescription() ? element.getDescription() : null)
+                            .set("asset_id", element.hasAssetId() ? element.getAssetId() : null)
+                            .set("external_id", element.hasExternalId() ? element.getExternalId() : null)
                             .set("metadata", metadata)
                             .set("columns", columns)
                             .set("created_time", element.hasCreatedTime() ?
-                                    formatter.format(Instant.ofEpochMilli(element.getCreatedTime().getValue())) : null)
+                                    formatter.format(Instant.ofEpochMilli(element.getCreatedTime())) : null)
                             .set("last_updated_time", element.hasLastUpdatedTime() ?
-                                    formatter.format(Instant.ofEpochMilli(element.getLastUpdatedTime().getValue())) : null)
-                            .set("data_set_id", element.hasDataSetId() ? element.getDataSetId().getValue() : null)
+                                    formatter.format(Instant.ofEpochMilli(element.getLastUpdatedTime())) : null)
+                            .set("data_set_id", element.hasDataSetId() ? element.getDataSetId() : null)
                             .set("row_updated_time", formatter.format(Instant.now()));
                 })
                 .withCreateDisposition(BigQueryIO.Write.CreateDisposition.CREATE_IF_NEEDED)

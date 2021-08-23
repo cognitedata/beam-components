@@ -14,10 +14,10 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <java.version>11</java.version>
 
-        <beam.version>2.29.0</beam.version>
-        <beam.connector.version>0.9.19</beam.connector.version>
+        <beam.version>2.31.0</beam.version>
+        <beam.connector.version>0.9.24</beam.connector.version>
         <junit.version>5.7.0</junit.version>
-        <logback.classic.version>1.2.3</logback.classic.version>
+        <logback.classic.version>1.2.5</logback.classic.version>
         <maven-jar-plugin.version>3.0.0</maven-jar-plugin.version>
     </properties>
 

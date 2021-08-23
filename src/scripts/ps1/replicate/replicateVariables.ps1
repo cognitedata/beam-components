@@ -9,6 +9,8 @@
 #-------------------------------------------------------------------
 #$cdfInputSecret = 'projectId.secretId'
 #$cdfOutputSecret = 'projectId.secretId'
+$cdfInputSecret = '919896902461.akerbp-dataflow-prod'
+$cdfOutputSecret = '919896902461.akerbp-dev-svc-replicator'
 
 # The CDF host
 $cdfInputHost = 'https://api.cognitedata.com'

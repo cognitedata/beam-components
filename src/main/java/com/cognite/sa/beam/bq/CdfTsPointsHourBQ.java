@@ -166,7 +166,7 @@ public class CdfTsPointsHourBQ {
                                 .withAppIdentifier("CdfTsPointsHourBQ"))
                 ).apply("Filter out TS w/ security categories", Filter.by(
                         tsHeader -> tsHeader.getSecurityCategoriesList().isEmpty()
-                                && !tsHeader.getName().getValue().startsWith("SRE-cognite-sre-Timeseries")
+                                && !tsHeader.getName().startsWith("SRE-cognite-sre-Timeseries")
                                 && !tsHeader.getIsString()
                 ));
 
@@ -183,7 +183,7 @@ public class CdfTsPointsHourBQ {
                         .via((Iterable<TimeseriesMetadata> input) -> {
                             List<Map<String, Object>> items = new ArrayList<>();
                             for (TimeseriesMetadata ts : input) {
-                                items.add(ImmutableMap.of("id", ts.getId().getValue()));
+                                items.add(ImmutableMap.of("id", ts.getId()));
                             }
 
                             // set time window to the past 1 - 2 days
@@ -212,30 +212,30 @@ public class CdfTsPointsHourBQ {
                     DateTimeFormatter formatter = DateTimeFormatter.ISO_INSTANT;
                     return new TableRow()
                             .set("id", element.getId())
-                            .set("external_id", element.hasExternalId() ? element.getExternalId().getValue() : null)
+                            .set("external_id", element.hasExternalId() ? element.getExternalId() : null)
                             .set("timestamp", formatter.format(Instant.ofEpochMilli(element.getTimestamp())))
                             .set("average", element.getValueAggregates().hasAverage() ?
-                                    element.getValueAggregates().getAverage().getValue() : null)
+                                    element.getValueAggregates().getAverage() : null)
                             .set("average", element.getValueAggregates().hasAverage() ?
-                                    element.getValueAggregates().getAverage().getValue() : null)
+                                    element.getValueAggregates().getAverage() : null)
                             .set("max", element.getValueAggregates().hasMax() ?
-                                    element.getValueAggregates().getMax().getValue() : null)
+                                    element.getValueAggregates().getMax() : null)
                             .set("min", element.getValueAggregates().hasMin() ?
-                                    element.getValueAggregates().getMin().getValue() : null)
+                                    element.getValueAggregates().getMin() : null)
                             .set("count", element.getValueAggregates().hasCount() ?
-                                    element.getValueAggregates().getCount().getValue() : null)
+                                    element.getValueAggregates().getCount() : null)
                             .set("sum", element.getValueAggregates().hasSum() ?
-                                    element.getValueAggregates().getSum().getValue() : null)
+                                    element.getValueAggregates().getSum() : null)
                             .set("interpolation", element.getValueAggregates().hasInterpolation() ?
-                                    element.getValueAggregates().getInterpolation().getValue() : null)
+                                    element.getValueAggregates().getInterpolation() : null)
                             .set("step_interpolation", element.getValueAggregates().hasStepInterpolation() ?
-                                    element.getValueAggregates().getStepInterpolation().getValue() : null)
+                                    element.getValueAggregates().getStepInterpolation() : null)
                             .set("continuous_variance", element.getValueAggregates().hasContinuousVariance() ?
-                                    element.getValueAggregates().getContinuousVariance().getValue() : null)
+                                    element.getValueAggregates().getContinuousVariance() : null)
                             .set("discrete_variance", element.getValueAggregates().hasDiscreteVariance() ?
-                                    element.getValueAggregates().getDiscreteVariance().getValue() : null)
+                                    element.getValueAggregates().getDiscreteVariance() : null)
                             .set("total_variation", element.getValueAggregates().hasTotalVariation() ?
-                                    element.getValueAggregates().getTotalVariation().getValue() : null)
+                                    element.getValueAggregates().getTotalVariation() : null)
                             .set("row_updated_time", formatter.format(Instant.now()));
                 })
                 .withCreateDisposition(BigQueryIO.Write.CreateDisposition.CREATE_IF_NEEDED)

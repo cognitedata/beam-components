@@ -98,9 +98,9 @@ public class ReplicateRelationships {
             if (config.getOrDefault(dataSetConfigKey, "no").equalsIgnoreCase("yes")
                     && input.hasDataSetId()) {
                 String targetDataSetExtId = sourceDataSetsIdMap.getOrDefault(
-                        input.getDataSetId().getValue(), String.valueOf(input.getDataSetId().getValue()));
+                        input.getDataSetId(), String.valueOf(input.getDataSetId()));
                 if (targetDataSetsExtIdMap.containsKey(targetDataSetExtId)) {
-                    builder.setDataSetId(Int64Value.of(targetDataSetsExtIdMap.get(targetDataSetExtId)));
+                    builder.setDataSetId(targetDataSetsExtIdMap.get(targetDataSetExtId));
                     dataSetMapCounter.inc();
                 }
             }
@@ -212,10 +212,10 @@ public class ReplicateRelationships {
                         .into(TypeDescriptors.kvs(TypeDescriptors.longs(), TypeDescriptors.strings()))
                         .via((DataSet dataSet) -> {
                             LOG.info("Source data set - id: {}, extId: {}, name: {}",
-                                    dataSet.getId().getValue(),
-                                    dataSet.getExternalId().getValue(),
-                                    dataSet.getName().getValue());
-                            return KV.of(dataSet.getId().getValue(), dataSet.getExternalId().getValue());
+                                    dataSet.getId(),
+                                    dataSet.getExternalId(),
+                                    dataSet.getName());
+                            return KV.of(dataSet.getId(), dataSet.getExternalId());
                         }))
                 .apply("Max per key", Max.perKey())
                 .apply("To map view", View.asMap());
@@ -230,10 +230,10 @@ public class ReplicateRelationships {
                         .into(TypeDescriptors.kvs(TypeDescriptors.strings(), TypeDescriptors.longs()))
                         .via((DataSet dataSet) -> {
                             LOG.info("Target data set - id: {}, extId: {}, name: {}",
-                                    dataSet.getId().getValue(),
-                                    dataSet.getExternalId().getValue(),
-                                    dataSet.getName().getValue());
-                            return KV.of(dataSet.getExternalId().getValue(), dataSet.getId().getValue());
+                                    dataSet.getId(),
+                                    dataSet.getExternalId(),
+                                    dataSet.getName());
+                            return KV.of(dataSet.getExternalId(), dataSet.getId());
                         }))
                 .apply("Max per key", Max.perKey())
                 .apply("To map view", View.asMap());

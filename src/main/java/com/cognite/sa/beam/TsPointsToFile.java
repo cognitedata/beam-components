@@ -96,7 +96,7 @@ public class TsPointsToFile {
         // Write to file
         tsPoints.apply("Map to string", MapElements.into(TypeDescriptors.strings())
                 .via(tsPoint -> new StringBuilder()
-                        .append(tsPoint.getExternalId().getValue())
+                        .append(tsPoint.getExternalId())
                         .append(delimiter).append(tsPoint.getTimestamp())
                         .append(delimiter).append(Instant.ofEpochMilli(tsPoint.getTimestamp()).toString())
                         .append(delimiter).append(tsPoint.getValueNum())

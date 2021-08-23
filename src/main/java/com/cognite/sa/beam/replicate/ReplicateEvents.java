@@ -110,7 +110,7 @@ public class ReplicateEvents {
                     .clearDataSetId();
 
             if (!input.hasExternalId()) {
-                builder.setExternalId(StringValue.of(String.valueOf(input.getId().getValue())));
+                builder.setExternalId(String.valueOf(input.getId()));
                 missingExtCounter.inc();
             }
 
@@ -132,41 +132,41 @@ public class ReplicateEvents {
             if (config.getOrDefault(dataSetConfigKey, "no").equalsIgnoreCase("yes")
                     && input.hasDataSetId()) {
                 String targetDataSetExtId = sourceDataSetsIdMap.getOrDefault(
-                        input.getDataSetId().getValue(), String.valueOf(input.getDataSetId().getValue()));
+                        input.getDataSetId(), String.valueOf(input.getDataSetId()));
                 if (targetDataSetsExtIdMap.containsKey(targetDataSetExtId)) {
-                    builder.setDataSetId(Int64Value.of(targetDataSetsExtIdMap.get(targetDataSetExtId)));
+                    builder.setDataSetId(targetDataSetsExtIdMap.get(targetDataSetExtId));
                     dataSetMapCounter.inc();
                 }
             }
 
             // Check for constraint violations and correct the data
-            if (builder.getStartTime().getValue() < 0) {
-                builder.setStartTime(Int64Value.of(0L));
+            if (builder.getStartTime() < 0) {
+                builder.setStartTime(0L);
                 String message = "startTime was < 0. Setting startTime to 0L.";
                 builder.putMetadata("constraintViolationStartTime_b", message);
-                LOG.warn(message + " Event externalId: {}", builder.getExternalId().getValue());
+                LOG.warn(message + " Event externalId: {}", builder.getExternalId());
             }
 
-            if (builder.getEndTime().getValue() < 0) {
-                builder.setEndTime(Int64Value.of(builder.getStartTime().getValue()));
+            if (builder.getEndTime() < 0) {
+                builder.setEndTime(builder.getStartTime());
                 String message = "endTime was < 0. Set endTime to be equal to startTime";
                 builder.putMetadata("constraintViolationEndTime_b", message);
-                LOG.warn(message + " Event externalId: {}", builder.getExternalId().getValue());
+                LOG.warn(message + " Event externalId: {}", builder.getExternalId());
             }
 
             if (builder.hasEndTime() && builder.hasStartTime()
-                        && builder.getStartTime().getValue() > builder.getEndTime().getValue()) {
-                builder.setStartTime(Int64Value.of(builder.getEndTime().getValue()));
+                        && builder.getStartTime() > builder.getEndTime()) {
+                builder.setStartTime(builder.getEndTime());
                 String message = "startTime was greater than endTime. Changed startTime to be equal to endTime.";
                 builder.putMetadata("constraintViolationStartTime_b", message);
-                LOG.warn(message + " Event externalId: {}", builder.getExternalId().getValue());
+                LOG.warn(message + " Event externalId: {}", builder.getExternalId());
             }
 
-            if (builder.getDescription().getValue().length() > 500) {
-                builder.setDescription(StringValue.of(builder.getDescription().getValue().substring(0, 500)));
+            if (builder.getDescription().length() > 500) {
+                builder.setDescription(builder.getDescription().substring(0, 500));
                 String message = "Description length was >500 characters. Truncated the description to the first 500 characters.";
                 builder.putMetadata("constraintViolationDescription", message);
-                LOG.warn(message + " Event externalId: {}", builder.getExternalId().getValue());
+                LOG.warn(message + " Event externalId: {}", builder.getExternalId());
             }
 
             out.output(builder.build());
@@ -301,7 +301,7 @@ public class ReplicateEvents {
                                 .enableMetrics(false)))
                 .apply("Extract id + externalId", MapElements
                         .into(TypeDescriptors.kvs(TypeDescriptors.longs(), TypeDescriptors.strings()))
-                        .via((Asset asset) -> KV.of(asset.getId().getValue(), asset.getExternalId().getValue())))
+                        .via((Asset asset) -> KV.of(asset.getId(), asset.getExternalId())))
                 .apply("Max per key", Max.perKey())
                 .apply("To map view", View.asMap());
 
@@ -313,7 +313,7 @@ public class ReplicateEvents {
                                 .enableMetrics(false)))
                 .apply("Extract externalId + id", MapElements
                         .into(TypeDescriptors.kvs(TypeDescriptors.strings(), TypeDescriptors.longs()))
-                        .via((Asset asset) -> KV.of(asset.getExternalId().getValue(), asset.getId().getValue())))
+                        .via((Asset asset) -> KV.of(asset.getExternalId(), asset.getId())))
                 .apply("Max per key", Max.perKey())
                 .apply("To map view", View.asMap());
 
@@ -331,10 +331,10 @@ public class ReplicateEvents {
                         .into(TypeDescriptors.kvs(TypeDescriptors.longs(), TypeDescriptors.strings()))
                         .via((DataSet dataSet) -> {
                                     LOG.info("Source dataset - id: {}, extId: {}, name: {}",
-                                            dataSet.getId().getValue(),
-                                            dataSet.getExternalId().getValue(),
-                                            dataSet.getName().getValue());
-                                    return KV.of(dataSet.getId().getValue(), dataSet.getExternalId().getValue());
+                                            dataSet.getId(),
+                                            dataSet.getExternalId(),
+                                            dataSet.getName());
+                                    return KV.of(dataSet.getId(), dataSet.getExternalId());
                                 }
                         ))
                 .apply("Max per key", Max.perKey())
@@ -350,10 +350,10 @@ public class ReplicateEvents {
                         .into(TypeDescriptors.kvs(TypeDescriptors.strings(), TypeDescriptors.longs()))
                         .via((DataSet dataSet) -> {
                                     LOG.info("Target dataset - id: {}, extId: {}, name: {}",
-                                            dataSet.getId().getValue(),
-                                            dataSet.getExternalId().getValue(),
-                                            dataSet.getName().getValue());
-                                    return KV.of(dataSet.getExternalId().getValue(), dataSet.getId().getValue());
+                                            dataSet.getId(),
+                                            dataSet.getExternalId(),
+                                            dataSet.getName());
+                                    return KV.of(dataSet.getExternalId(), dataSet.getId());
                                 }
                         ))
                 .apply("Max per key", Max.perKey())

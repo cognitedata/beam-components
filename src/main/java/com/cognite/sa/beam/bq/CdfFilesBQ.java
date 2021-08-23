@@ -181,25 +181,25 @@ public class CdfFilesBQ {
                     }
 
                     return new TableRow()
-                            .set("id", element.hasId() ? element.getId().getValue() : null)
-                            .set("external_id", element.hasExternalId() ? element.getExternalId().getValue() : null)
+                            .set("id", element.hasId() ? element.getId() : null)
+                            .set("external_id", element.hasExternalId() ? element.getExternalId() : null)
                             .set("source_created_time", element.hasSourceCreatedTime() ?
-                                    formatter.format(Instant.ofEpochMilli(element.getSourceCreatedTime().getValue())) : null)
+                                    formatter.format(Instant.ofEpochMilli(element.getSourceCreatedTime())) : null)
                             .set("source_modified_time", element.hasSourceModifiedTime() ?
-                                    formatter.format(Instant.ofEpochMilli(element.getSourceModifiedTime().getValue())) : null)
-                            .set("name", element.hasName() ? element.getName().getValue() : null)
-                            .set("mime_type", element.hasMimeType() ? element.getMimeType().getValue() : null)
-                            .set("source", element.hasSource() ? element.getSource().getValue() : null)
+                                    formatter.format(Instant.ofEpochMilli(element.getSourceModifiedTime())) : null)
+                            .set("name", element.hasName() ? element.getName() : null)
+                            .set("mime_type", element.hasMimeType() ? element.getMimeType() : null)
+                            .set("source", element.hasSource() ? element.getSource() : null)
                             .set("asset_ids", assetIds)
                             .set("security_categories", securityCategories)
                             .set("uploaded", element.getUploaded())
                             .set("uploaded_time", element.hasUploadedTime() ?
-                                    formatter.format(Instant.ofEpochMilli(element.getUploadedTime().getValue())) : null)
+                                    formatter.format(Instant.ofEpochMilli(element.getUploadedTime())) : null)
                             .set("created_time", element.hasCreatedTime() ?
-                                    formatter.format(Instant.ofEpochMilli(element.getCreatedTime().getValue())) : null)
+                                    formatter.format(Instant.ofEpochMilli(element.getCreatedTime())) : null)
                             .set("last_updated_time", element.hasLastUpdatedTime() ?
-                                    formatter.format(Instant.ofEpochMilli(element.getLastUpdatedTime().getValue())) : null)
-                            .set("data_set_id", element.hasDataSetId() ? element.getDataSetId().getValue() : null)
+                                    formatter.format(Instant.ofEpochMilli(element.getLastUpdatedTime())) : null)
+                            .set("data_set_id", element.hasDataSetId() ? element.getDataSetId() : null)
                             .set("metadata", metadata)
                             .set("row_updated_time", formatter.format(Instant.now()));
                 })
