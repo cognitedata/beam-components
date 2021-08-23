@@ -216,7 +216,7 @@ public class CdfRawBQ {
                             .set("table_name", element.getTableName())
                             .set("row_key", element.getKey())
                             .set("last_updated_time", formatter.format(Instant.ofEpochMilli(
-                                    element.getLastUpdatedTime().getValue())))
+                                    element.getLastUpdatedTime())))
                             .set("columns", columns)
                             .set("row_updated_time", formatter.format(Instant.now()));
                 })

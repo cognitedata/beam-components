@@ -102,7 +102,7 @@ public class ReplicateFiles {
                     .clearDataSetId();
 
             if (!fileMetadata.hasExternalId()) {
-                fileMetadataBuilder.setExternalId(StringValue.of(String.valueOf(fileMetadata.getId().getValue())));
+                fileMetadataBuilder.setExternalId(String.valueOf(fileMetadata.getId()));
                 missingExtIdCounter.inc();
             }
 
@@ -128,11 +128,11 @@ public class ReplicateFiles {
             if(config.getOrDefault(dataSetConfigKey, "no").equalsIgnoreCase("yes")
                     && fileMetadata.hasDataSetId()) {
                 String targetDataSetExtId = sourceDataSetsIdMap.getOrDefault(
-                        fileMetadata.getDataSetId().getValue(),
-                        String.valueOf(fileMetadata.getDataSetId().getValue()));
+                        fileMetadata.getDataSetId(),
+                        String.valueOf(fileMetadata.getDataSetId()));
 
                 if (targetDataSetsExtIdMap.containsKey(targetDataSetExtId)) {
-                    fileMetadataBuilder.setDataSetId(Int64Value.of(targetDataSetsExtIdMap.get(targetDataSetExtId)));
+                    fileMetadataBuilder.setDataSetId(targetDataSetsExtIdMap.get(targetDataSetExtId));
                     dataSetMapCounter.inc();
                 }
             }
@@ -256,7 +256,7 @@ public class ReplicateFiles {
                                 .enableMetrics(false)))
                 .apply("Extract id + externalId", MapElements
                         .into(TypeDescriptors.kvs(TypeDescriptors.longs(), TypeDescriptors.strings()))
-                        .via((Asset asset) -> KV.of(asset.getId().getValue(), asset.getExternalId().getValue())))
+                        .via((Asset asset) -> KV.of(asset.getId(), asset.getExternalId())))
                 .apply("Max per key", Max.perKey())
                 .apply("To map view", View.asMap());
 
@@ -268,7 +268,7 @@ public class ReplicateFiles {
                                 .enableMetrics(false)))
                 .apply("Extract externalId + id", MapElements
                         .into(TypeDescriptors.kvs(TypeDescriptors.strings(), TypeDescriptors.longs()))
-                        .via((Asset asset) -> KV.of(asset.getExternalId().getValue(), asset.getId().getValue())))
+                        .via((Asset asset) -> KV.of(asset.getExternalId(), asset.getId())))
                 .apply("Max per key", Max.perKey())
                 .apply("To map view", View.asMap());
 
@@ -287,10 +287,10 @@ public class ReplicateFiles {
                         .into(TypeDescriptors.kvs(TypeDescriptors.longs(), TypeDescriptors.strings()))
                         .via((DataSet dataSet) -> {
                             LOG.info("Source dataset - id: {}, extId: {}, name: {}",
-                                    dataSet.getId().getValue(),
-                                    dataSet.getExternalId().getValue(),
-                                    dataSet.getName().getValue());
-                            return KV.of(dataSet.getId().getValue(), dataSet.getExternalId().getValue());
+                                    dataSet.getId(),
+                                    dataSet.getExternalId(),
+                                    dataSet.getName());
+                            return KV.of(dataSet.getId(), dataSet.getExternalId());
                         }))
                 .apply("Max per key", Max.perKey())
                 .apply("To map view", View.asMap());
@@ -304,10 +304,10 @@ public class ReplicateFiles {
                         .into(TypeDescriptors.kvs(TypeDescriptors.strings(), TypeDescriptors.longs()))
                         .via((DataSet dataSet) -> {
                             LOG.info("Target dataset - id: {}, extId: {}, name: {}",
-                                    dataSet.getId().getValue(),
-                                    dataSet.getExternalId().getValue(),
-                                    dataSet.getName().getValue());
-                            return KV.of(dataSet.getExternalId().getValue(), dataSet.getId().getValue());
+                                    dataSet.getId(),
+                                    dataSet.getExternalId(),
+                                    dataSet.getName());
+                            return KV.of(dataSet.getExternalId(), dataSet.getId());
                         }))
                 .apply("Max per key", Max.perKey())
                 .apply("To map view", View.asMap());
@@ -339,7 +339,10 @@ public class ReplicateFiles {
                         // Add filter for max lastUpdatedTime
                         RequestParameters req = input
                                 .withFilterParameter("lastUpdatedTime", ImmutableMap.of(
-                                        "max", System.currentTimeMillis()));
+                                        "max", System.currentTimeMillis()
+
+                                ))
+                                ;
 
                         if (dataSetExternalIds.isEmpty() || allowList.contains("*")) {
                             LOG.info("Will not filter on data set external id ");
@@ -353,10 +356,12 @@ public class ReplicateFiles {
                 .apply("Read source files", CogniteIO.readAllFiles()
                         .withProjectConfig(sourceConfig)
                         .withHints(Hints.create()
-                                .withReadShards(10))
+                                .withReadFileBinaryBatchSize(8))
                         .withReaderConfig(ReaderConfig.create()
                                 .withAppIdentifier(appIdentifier))
-                        .withTempStorageURI(options.getTempStorageUri()))
+                        .withTempStorageURI(options.getTempStorageUri())
+                        .enableForceTempStorage(true)
+                )
                 .apply("Process files", ParDo.of(new PrepareFiles(configMap,
                         sourceAssetsIdMap,
                         targetAssetsExtIdMap,
@@ -371,7 +376,8 @@ public class ReplicateFiles {
                 .apply("Write target files", CogniteIO.writeFiles()
                         .withProjectConfig(targetConfig)
                         .withHints(Hints.create()
-                                .withWriteShards(5))
+                                .withWriteShards(4)
+                                .withWriteFileBatchSize(8))
                         .withWriterConfig(WriterConfig.create()
                                 .withAppIdentifier(appIdentifier)
                                 .withUpsertMode(UpsertMode.REPLACE)));

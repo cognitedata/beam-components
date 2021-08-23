@@ -92,11 +92,11 @@ public class ReplicateAssets {
             Preconditions.checkArgument(input.hasExternalId(),
                     String.format("Source assets must have an externalId. Name: [%s], Id: [%d]",
                             input.getName(),
-                            input.getId().getValue()));
+                            input.getId()));
             Preconditions.checkArgument(input.hasRootId(),
                     String.format("Source assets must have a root id. Name: [%s], Id: [%d]",
                             input.getName(),
-                            input.getId().getValue()));
+                            input.getId()));
             Map<Long, String> sourceAssetsIdMap = context.sideInput(sourceAssetsIdMapView);
             Map<Long, String> sourceDataSetsIdMap = context.sideInput(sourceDataSetsIdMapView);
             Map<String, Long> targetDataSetsExtIdMap = context.sideInput(targetDataSetsExtIdMapView);
@@ -109,8 +109,8 @@ public class ReplicateAssets {
                     .clearParentId()
                     .clearDataSetId();
 
-            if (sourceAssetsIdMap.containsKey(input.getParentId().getValue())) {
-                builder.setParentExternalId(StringValue.of(sourceAssetsIdMap.get(input.getParentId().getValue())));
+            if (sourceAssetsIdMap.containsKey(input.getParentId())) {
+                builder.setParentExternalId(sourceAssetsIdMap.get(input.getParentId()));
             } else {
                 // No parent to map to--will be a root asset.
                 rootAssetCounter.inc();
@@ -120,14 +120,14 @@ public class ReplicateAssets {
             if (config.getOrDefault(dataSetConfigKey, "no").equalsIgnoreCase("yes")
                     && input.hasDataSetId()) {
                 String targetDataSetExtId = sourceDataSetsIdMap.getOrDefault(
-                        input.getDataSetId().getValue(), String.valueOf(input.getDataSetId().getValue()));
+                        input.getDataSetId(), String.valueOf(input.getDataSetId()));
                 if (targetDataSetsExtIdMap.containsKey(targetDataSetExtId)) {
-                    builder.setDataSetId(Int64Value.of(targetDataSetsExtIdMap.get(targetDataSetExtId)));
+                    builder.setDataSetId(targetDataSetsExtIdMap.get(targetDataSetExtId));
                     dataSetMapCounter.inc();
                 }
             }
 
-            out.output(KV.of(sourceAssetsIdMap.getOrDefault(input.getRootId().getValue(),
+            out.output(KV.of(sourceAssetsIdMap.getOrDefault(input.getRootId(),
                     ""), builder.build()));
         }
     }
@@ -265,7 +265,7 @@ public class ReplicateAssets {
                 .apply("Filter on extId", Filter.by(item -> item.hasExternalId()))
                 .apply("Extract id + externalId", MapElements
                         .into(TypeDescriptors.kvs(TypeDescriptors.longs(), TypeDescriptors.strings()))
-                        .via((Asset asset) -> KV.of(asset.getId().getValue(), asset.getExternalId().getValue())))
+                        .via((Asset asset) -> KV.of(asset.getId(), asset.getExternalId())))
                 .apply("Max per key", Max.perKey())
                 .apply("To map view", View.asMap());
 
@@ -284,10 +284,10 @@ public class ReplicateAssets {
                         .into(TypeDescriptors.kvs(TypeDescriptors.longs(), TypeDescriptors.strings()))
                         .via((DataSet dataSet) -> {
                             LOG.info("Source dataset - id: {}, extId: {}, name: {}",
-                                    dataSet.getId().getValue(),
-                                    dataSet.getExternalId().getValue(),
-                                    dataSet.getName().getValue());
-                            return KV.of(dataSet.getId().getValue(), dataSet.getExternalId().getValue());
+                                    dataSet.getId(),
+                                    dataSet.getExternalId(),
+                                    dataSet.getName());
+                            return KV.of(dataSet.getId(), dataSet.getExternalId());
                                 }
                                 ))
                 .apply("Max per key", Max.perKey())
@@ -304,10 +304,10 @@ public class ReplicateAssets {
                         .into(TypeDescriptors.kvs(TypeDescriptors.strings(), TypeDescriptors.longs()))
                         .via((DataSet dataSet) -> {
                             LOG.info("Target dataset - id: {}, extId: {}, name: {}",
-                                    dataSet.getId().getValue(),
-                                    dataSet.getExternalId().getValue(),
-                                    dataSet.getName().getValue());
-                            return KV.of(dataSet.getExternalId().getValue(), dataSet.getId().getValue());
+                                    dataSet.getId(),
+                                    dataSet.getExternalId(),
+                                    dataSet.getName());
+                            return KV.of(dataSet.getExternalId(), dataSet.getId());
                                 }
                                 ))
                 .apply("Max per key", Max.perKey())
@@ -370,7 +370,7 @@ public class ReplicateAssets {
                         if (!denyList.isEmpty()) {
                             if (denyList.contains(input.getKey())) {
                                 LOG.debug("Deny list match root externalId {}. Asset [{}] will be dropped.",
-                                        input.getKey(), input.getValue().getExternalId().getValue());
+                                        input.getKey(), input.getValue().getExternalId());
                                 return;
                             }
                         }
@@ -379,7 +379,7 @@ public class ReplicateAssets {
                             out.output(input);
                         } else if (allowList.contains(input.getKey())) {
                             LOG.debug("Allow list match root externalId {}. Asset [{}] will be included.",
-                                    input.getKey(), input.getValue().getExternalId().getValue());
+                                    input.getKey(), input.getValue().getExternalId());
                             out.output(input);
                         }
                     }

@@ -104,7 +104,7 @@ public class ReplicateSequences {
                     .clearDataSetId();
 
             if (!input.hasExternalId()) {
-                builder.setExternalId(StringValue.of(String.valueOf(input.getId().getValue())));
+                builder.setExternalId(String.valueOf(input.getId()));
                 missingExtCounter.inc();
             }
 
@@ -112,11 +112,11 @@ public class ReplicateSequences {
             if (config.getOrDefault(contextualizationConfigKey, "no").equalsIgnoreCase("yes")
                     && input.hasAssetId()) {
                 // if the source asset has an externalId use it--if not, use the asset internal id
-                String targetAssetExtId = sourceAssetsIdMap.getOrDefault(input.getAssetId().getValue(),
-                        String.valueOf(input.getAssetId().getValue()));
+                String targetAssetExtId = sourceAssetsIdMap.getOrDefault(input.getAssetId(),
+                        String.valueOf(input.getAssetId()));
 
                 if (targetAssetsIdMap.containsKey(targetAssetExtId)) {
-                    builder.setAssetId(Int64Value.of(targetAssetsIdMap.get(targetAssetExtId)));
+                    builder.setAssetId(targetAssetsIdMap.get(targetAssetExtId));
                     assetMapCounter.inc();
                 }
             }
@@ -125,10 +125,10 @@ public class ReplicateSequences {
             if (config.getOrDefault(dataSetConfigKey, "no").equalsIgnoreCase("yes")
                     && input.hasDataSetId()) {
                 String targetDataSetExtId = sourceDataSetsIdMap.getOrDefault(
-                        input.getDataSetId().getValue(), String.valueOf(input.getDataSetId().getValue()));
+                        input.getDataSetId(), String.valueOf(input.getDataSetId()));
 
                 if (targetDataSetsIdMap.containsKey(targetDataSetExtId)) {
-                    builder.setDataSetId(Int64Value.of(targetDataSetsIdMap.get(targetDataSetExtId)));
+                    builder.setDataSetId(targetDataSetsIdMap.get(targetDataSetExtId));
                     dataSetMapCounter.inc();
                 }
             }
@@ -264,7 +264,7 @@ public class ReplicateSequences {
                                 .enableMetrics(false)))
                 .apply("Extract id + externalId", MapElements
                         .into(TypeDescriptors.kvs(TypeDescriptors.longs(), TypeDescriptors.strings()))
-                        .via((Asset asset) -> KV.of(asset.getId().getValue(), asset.getExternalId().getValue())))
+                        .via((Asset asset) -> KV.of(asset.getId(), asset.getExternalId())))
                 .apply("Max per key", Max.perKey())
                 .apply("To map view", View.asMap());
 
@@ -276,7 +276,7 @@ public class ReplicateSequences {
                                 .enableMetrics(false)))
                 .apply("Extract externalId + id", MapElements
                         .into(TypeDescriptors.kvs(TypeDescriptors.strings(), TypeDescriptors.longs()))
-                        .via((Asset asset) -> KV.of(asset.getExternalId().getValue(), asset.getId().getValue())))
+                        .via((Asset asset) -> KV.of(asset.getExternalId(), asset.getId())))
                 .apply("Max per key", Max.perKey())
                 .apply("To map view", View.asMap());
 
@@ -295,10 +295,10 @@ public class ReplicateSequences {
                         .into(TypeDescriptors.kvs(TypeDescriptors.longs(), TypeDescriptors.strings()))
                         .via((DataSet dataSet) -> {
                             LOG.info("Source dataset - id: {}, extId: {}, name: {}",
-                                    dataSet.getId().getValue(),
-                                    dataSet.getExternalId().getValue(),
-                                    dataSet.getName().getValue());
-                            return KV.of(dataSet.getId().getValue(), dataSet.getExternalId().getValue());
+                                    dataSet.getId(),
+                                    dataSet.getExternalId(),
+                                    dataSet.getName());
+                            return KV.of(dataSet.getId(), dataSet.getExternalId());
                         }))
                 .apply("Max per key", Max.perKey())
                 .apply("To map view", View.asMap());
@@ -312,10 +312,10 @@ public class ReplicateSequences {
                         .into(TypeDescriptors.kvs(TypeDescriptors.strings(), TypeDescriptors.longs()))
                         .via((DataSet dataSet) -> {
                             LOG.info("Target dataset - id: {}, extId: {}, name: {}",
-                                    dataSet.getId().getValue(),
-                                    dataSet.getExternalId().getValue(),
-                                    dataSet.getName().getValue());
-                            return KV.of(dataSet.getExternalId().getValue(), dataSet.getId().getValue());
+                                    dataSet.getId(),
+                                    dataSet.getExternalId(),
+                                    dataSet.getName());
+                            return KV.of(dataSet.getExternalId(), dataSet.getId());
                         }))
                 .apply("Max per key", Max.perKey())
                 .apply("To map view", View.asMap());
@@ -360,8 +360,8 @@ public class ReplicateSequences {
 
                         // Check for deny list match
                         if (!denyList.isEmpty() && input.hasExternalId()) {
-                            if (denyList.contains(input.getExternalId().getValue())) {
-                                LOG.debug("Deny list match {}. Sequence will be dropped.", input.getExternalId().getValue());
+                            if (denyList.contains(input.getExternalId())) {
+                                LOG.debug("Deny list match {}. Sequence will be dropped.", input.getExternalId());
                                 return;
                             }
                         }
@@ -372,8 +372,8 @@ public class ReplicateSequences {
                             out.output(input);
                             return;
                         }
-                        if (allowList.contains(input.getExternalId().getValue())) {
-                            LOG.debug("Allow list match {}. Sequence will be included.", input.getExternalId().getValue());
+                        if (allowList.contains(input.getExternalId())) {
+                            LOG.debug("Allow list match {}. Sequence will be included.", input.getExternalId());
                             out.output(input);
                         }
                     }
@@ -422,7 +422,7 @@ public class ReplicateSequences {
                         .via((SequenceMetadata input) -> {
                             int limit = 10000;
                             Map<String, Object> requestParameters = new HashMap<String, Object>();
-                            requestParameters.put("id", input.getId().getValue());
+                            requestParameters.put("id", input.getId());
                             return RequestParameters.create()
                                     .withRequestParameters(requestParameters)
                                     .withRootParameter("limit", limit);

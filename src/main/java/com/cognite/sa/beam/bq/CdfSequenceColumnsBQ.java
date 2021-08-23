@@ -106,7 +106,7 @@ public class CdfSequenceColumnsBQ {
                         List<SequenceColumn> sequenceColumnList = input.getColumnsList();
                         for (SequenceColumn column : sequenceColumnList) {
                             out.output(KV.of(
-                                    input.getExternalId().getValue(),
+                                    input.getExternalId(),
                                     column
                             ));
                         }
@@ -132,16 +132,16 @@ public class CdfSequenceColumnsBQ {
                     String valueTypeString = SequenceParser.toString(column.getValueType());
 
                     return new TableRow()
-                            .set("name", column.hasName() ? column.getName().getValue() : null)
+                            .set("name", column.hasName() ? column.getName() : null)
                             .set("external_id", column.getExternalId())
                             .set("seq_external_id", seqExternalId)
-                            .set("description", column.hasDescription() ? column.getDescription().getValue() : null)
+                            .set("description", column.hasDescription() ? column.getDescription() : null)
                             .set("value_type", valueTypeString)
                             .set("metadata", metadata)
                             .set("created_time", column.hasCreatedTime() ?
-                                    formatter.format(Instant.ofEpochMilli(column.getCreatedTime().getValue())) : null)
+                                    formatter.format(Instant.ofEpochMilli(column.getCreatedTime())) : null)
                             .set("last_updated_time", column.hasLastUpdatedTime() ?
-                                    formatter.format(Instant.ofEpochMilli(column.getLastUpdatedTime().getValue())) : null)
+                                    formatter.format(Instant.ofEpochMilli(column.getLastUpdatedTime())) : null)
                             .set("row_updated_time", formatter.format(Instant.now()));
                 })
                 .withCreateDisposition(BigQueryIO.Write.CreateDisposition.CREATE_IF_NEEDED)

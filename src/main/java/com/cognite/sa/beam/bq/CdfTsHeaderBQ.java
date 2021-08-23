@@ -176,20 +176,20 @@ public class CdfTsHeaderBQ {
                     }
 
                     return new TableRow()
-                            .set("id", element.hasId() ? element.getId().getValue() : null)
-                            .set("external_id", element.hasExternalId() ? element.getExternalId().getValue() : null)
-                            .set("name", element.hasName() ? element.getName().getValue() : null)
-                            .set("description", element.hasDescription() ? element.getDescription().getValue() : null)
+                            .set("id", element.hasId() ? element.getId() : null)
+                            .set("external_id", element.hasExternalId() ? element.getExternalId() : null)
+                            .set("name", element.hasName() ? element.getName() : null)
+                            .set("description", element.hasDescription() ? element.getDescription() : null)
                             .set("is_string", element.getIsString())
                             .set("is_step", element.getIsStep())
-                            .set("unit", element.hasUnit() ? element.getUnit().getValue() : null)
-                            .set("asset_id", element.hasAssetId() ? element.getAssetId().getValue() : null)
+                            .set("unit", element.hasUnit() ? element.getUnit() : null)
+                            .set("asset_id", element.hasAssetId() ? element.getAssetId() : null)
                             .set("security_categories", securityCategories)
                             .set("created_time", element.hasCreatedTime() ?
-                                    formatter.format(Instant.ofEpochMilli(element.getCreatedTime().getValue())) : null)
+                                    formatter.format(Instant.ofEpochMilli(element.getCreatedTime())) : null)
                             .set("last_updated_time", element.hasLastUpdatedTime() ?
-                                    formatter.format(Instant.ofEpochMilli(element.getLastUpdatedTime().getValue())) : null)
-                            .set("data_set_id", element.hasDataSetId() ? element.getDataSetId().getValue() : null)
+                                    formatter.format(Instant.ofEpochMilli(element.getLastUpdatedTime())) : null)
+                            .set("data_set_id", element.hasDataSetId() ? element.getDataSetId() : null)
                             .set("metadata", metadata)
                             .set("row_updated_time", formatter.format(Instant.now()));
                 })

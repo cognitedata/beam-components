@@ -169,16 +169,16 @@ public class CdfRelationshipsBQ {
                             .set("target_external_id", element.getTargetExternalId())
                             .set("target_type", RelationshipParser.toString(element.getTargetType()))
                             .set("start_time", element.hasStartTime() ?
-                                    formatter.format(Instant.ofEpochMilli(element.getStartTime().getValue())) : null)
+                                    formatter.format(Instant.ofEpochMilli(element.getStartTime())) : null)
                             .set("end_time", element.hasEndTime() ?
-                                    formatter.format(Instant.ofEpochMilli(element.getEndTime().getValue())) : null)
-                            .set("confidence", element.hasConfidence() ? element.getConfidence().getValue() : null)
-                            .set("data_set_id", element.hasDataSetId() ? element.getDataSetId().getValue() : null)
+                                    formatter.format(Instant.ofEpochMilli(element.getEndTime())) : null)
+                            .set("confidence", element.hasConfidence() ? element.getConfidence() : null)
+                            .set("data_set_id", element.hasDataSetId() ? element.getDataSetId() : null)
                             .set("labels", labels)
                             .set("created_time", element.hasCreatedTime() ?
-                                    formatter.format(Instant.ofEpochMilli(element.getCreatedTime().getValue())) : null)
+                                    formatter.format(Instant.ofEpochMilli(element.getCreatedTime())) : null)
                             .set("last_updated_time", element.hasLastUpdatedTime() ?
-                                    formatter.format(Instant.ofEpochMilli(element.getLastUpdatedTime().getValue())) : null)
+                                    formatter.format(Instant.ofEpochMilli(element.getLastUpdatedTime())) : null)
                             .set("row_updated_time", formatter.format(Instant.now()));
                 })
                 .withCreateDisposition(BigQueryIO.Write.CreateDisposition.CREATE_IF_NEEDED)

@@ -139,9 +139,9 @@ public class CdfLabelsBQ {
                     return new TableRow()
                             .set("external_id", element.getExternalId())
                             .set("name", element.getName())
-                            .set("description", element.hasDescription() ? element.getDescription().getValue() : null)
+                            .set("description", element.hasDescription() ? element.getDescription() : null)
                             .set("created_time", element.hasCreatedTime()
-                                    ? formatter.format(Instant.ofEpochMilli(element.getCreatedTime().getValue())) : null)
+                                    ? formatter.format(Instant.ofEpochMilli(element.getCreatedTime())) : null)
                             .set("row_updated_time", formatter.format(Instant.now()));
                 })
                 .withCreateDisposition(BigQueryIO.Write.CreateDisposition.CREATE_IF_NEEDED)

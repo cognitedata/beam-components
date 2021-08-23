@@ -156,7 +156,7 @@ public class CdfTsPointsBQ {
                                 .withAppIdentifier("CdfTsPointsBQ"))
                 ).apply("Filter out TS w/ security categories", Filter.by(
                         tsHeader -> tsHeader.getSecurityCategoriesList().isEmpty()
-                                && !tsHeader.getName().getValue().startsWith("SRE-cognite-sre-Timeseries")
+                                && !tsHeader.getName().startsWith("SRE-cognite-sre-Timeseries")
                 ));
 
         // Read ts points for all headers
@@ -174,7 +174,7 @@ public class CdfTsPointsBQ {
                                                ProcessContext context) {
                         List<Map<String, Object>> items = new ArrayList<>();
                         for (TimeseriesMetadata ts : input) {
-                            items.add(ImmutableMap.of("id", ts.getId().getValue()));
+                            items.add(ImmutableMap.of("id", ts.getId()));
                         }
 
                         // set time window to the past 1 - 2 hours
@@ -210,7 +210,7 @@ public class CdfTsPointsBQ {
                     DateTimeFormatter formatter = DateTimeFormatter.ISO_INSTANT;
                     return new TableRow()
                             .set("id", element.getId())
-                            .set("external_id", element.hasExternalId() ? element.getExternalId().getValue() : null)
+                            .set("external_id", element.hasExternalId() ? element.getExternalId() : null)
                             .set("timestamp", formatter.format(Instant.ofEpochMilli(element.getTimestamp())))
                             .set("value", element.getDatapointTypeCase() == TimeseriesPoint.DatapointTypeCase.VALUE_NUM ?
                                     element.getValueNum() : null)

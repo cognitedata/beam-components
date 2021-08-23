@@ -174,13 +174,13 @@ public class CdfEventsBQ {
 
                             // Check against the max allowed timestamp in BQ
                             if (eventBuilder.hasEndTime()
-                                    && eventBuilder.getEndTime().getValue() > maxTimestamp.toEpochMilli()) {
+                                    && eventBuilder.getEndTime() > maxTimestamp.toEpochMilli()) {
                                 LOG.warn("Event has [endTime] with too large value--will be reset to the max allowed."
                                         + " Event externalId: {}, original endTime: {}, description: {}",
-                                        eventBuilder.getExternalId().getValue(),
-                                        eventBuilder.getEndTime().getValue(),
-                                        eventBuilder.getDescription().getValue());
-                                eventBuilder.setEndTime(Int64Value.of(maxTimestamp.toEpochMilli()));
+                                        eventBuilder.getExternalId(),
+                                        eventBuilder.getEndTime(),
+                                        eventBuilder.getDescription());
+                                eventBuilder.setEndTime(maxTimestamp.toEpochMilli());
                             }
 
                             return eventBuilder.build();
@@ -202,22 +202,22 @@ public class CdfEventsBQ {
                     }
 
                     return new TableRow()
-                            .set("id", element.hasId() ? element.getId().getValue() : null)
-                            .set("external_id", element.hasExternalId() ? element.getExternalId().getValue() : null)
+                            .set("id", element.hasId() ? element.getId() : null)
+                            .set("external_id", element.hasExternalId() ? element.getExternalId() : null)
                             .set("start_time", element.hasStartTime() ?
-                                    formatter.format(Instant.ofEpochMilli(element.getStartTime().getValue())) : null)
+                                    formatter.format(Instant.ofEpochMilli(element.getStartTime())) : null)
                             .set("end_time", element.hasEndTime() ?
-                                    formatter.format(Instant.ofEpochMilli(element.getEndTime().getValue())) : null)
-                            .set("description", element.hasDescription() ? element.getDescription().getValue() : null)
-                            .set("type", element.hasType() ? element.getType().getValue() : null)
-                            .set("subtype", element.hasSubtype() ? element.getSubtype().getValue() : null)
-                            .set("source", element.hasSource() ? element.getSource().getValue() : null)
+                                    formatter.format(Instant.ofEpochMilli(element.getEndTime())) : null)
+                            .set("description", element.hasDescription() ? element.getDescription() : null)
+                            .set("type", element.hasType() ? element.getType() : null)
+                            .set("subtype", element.hasSubtype() ? element.getSubtype() : null)
+                            .set("source", element.hasSource() ? element.getSource() : null)
                             .set("asset_ids", assetIds)
                             .set("created_time", element.hasCreatedTime() ?
-                                    formatter.format(Instant.ofEpochMilli(element.getCreatedTime().getValue())) : null)
+                                    formatter.format(Instant.ofEpochMilli(element.getCreatedTime())) : null)
                             .set("last_updated_time", element.hasLastUpdatedTime() ?
-                                    formatter.format(Instant.ofEpochMilli(element.getLastUpdatedTime().getValue())) : null)
-                            .set("data_set_id", element.hasDataSetId() ? element.getDataSetId().getValue() : null)
+                                    formatter.format(Instant.ofEpochMilli(element.getLastUpdatedTime())) : null)
+                            .set("data_set_id", element.hasDataSetId() ? element.getDataSetId() : null)
                             .set("metadata", metadata)
                             .set("row_updated_time", formatter.format(Instant.now()));
                 })
