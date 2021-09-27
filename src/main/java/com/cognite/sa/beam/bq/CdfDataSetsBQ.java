@@ -87,13 +87,6 @@ public class CdfDataSetsBQ {
         ValueProvider<String> getCdfHost();
         void setCdfHost(ValueProvider<String> value);
 
-        /*
-        @Description("Full read flag. Set to true for full read, false for delta read.")
-        @Validation.Required
-        ValueProvider<Boolean> getFullRead();
-        void setFullRead(ValueProvider<Boolean> value);
-         */
-
         @Description("The BQ table to write to. The name should be in the format of <projectId>:<dataset>.<table>.")
         @Validation.Required
         ValueProvider<String> getOutputMainTable();
