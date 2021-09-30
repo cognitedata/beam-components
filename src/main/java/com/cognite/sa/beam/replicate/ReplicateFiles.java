@@ -27,8 +27,6 @@ import com.cognite.beam.io.transform.toml.ReadTomlStringArray;
 import com.cognite.beam.io.transform.toml.ReadTomlStringMap;
 import com.cognite.client.config.UpsertMode;
 import com.google.common.collect.ImmutableMap;
-import com.google.protobuf.Int64Value;
-import com.google.protobuf.StringValue;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.metrics.Counter;
