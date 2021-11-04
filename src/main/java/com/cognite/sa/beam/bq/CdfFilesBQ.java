@@ -62,6 +62,7 @@ public class CdfFilesBQ {
             new TableFieldSchema().setName("source_created_time").setType("TIMESTAMP"),
             new TableFieldSchema().setName("source_modified_time").setType("TIMESTAMP"),
             new TableFieldSchema().setName("name").setType("STRING"),
+            new TableFieldSchema().setName("directory").setType("STRING"),
             new TableFieldSchema().setName("mime_type").setType("STRING"),
             new TableFieldSchema().setName("source").setType("STRING"),
             new TableFieldSchema().setName("asset_ids").setType("INT64").setMode("REPEATED"),
@@ -188,6 +189,7 @@ public class CdfFilesBQ {
                             .set("source_modified_time", element.hasSourceModifiedTime() ?
                                     formatter.format(Instant.ofEpochMilli(element.getSourceModifiedTime())) : null)
                             .set("name", element.hasName() ? element.getName() : null)
+                            .set("directory", element.hasDirectory() ? element.getDirectory() : null)
                             .set("mime_type", element.hasMimeType() ? element.getMimeType() : null)
                             .set("source", element.hasSource() ? element.getSource() : null)
                             .set("asset_ids", assetIds)
