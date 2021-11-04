@@ -67,6 +67,7 @@ public class CdfFilesBQ {
             new TableFieldSchema().setName("source").setType("STRING"),
             new TableFieldSchema().setName("asset_ids").setType("INT64").setMode("REPEATED"),
             new TableFieldSchema().setName("security_categories").setType("INT64").setMode("REPEATED"),
+            new TableFieldSchema().setName("labels").setType("STRING").setMode("REPEATED"),
             new TableFieldSchema().setName("uploaded").setType("BOOL"),
             new TableFieldSchema().setName("uploaded_time").setType("TIMESTAMP"),
             new TableFieldSchema().setName("created_time").setType("TIMESTAMP"),
@@ -172,6 +173,7 @@ public class CdfFilesBQ {
                 .withFormatFunction((FileMetadata element) -> {
                     List<Long> assetIds = element.getAssetIdsList();
                     List<Long> securityCategories = element.getSecurityCategoriesList();
+                    List<String> labels = element.getLabelsList();
                     List<TableRow> metadata = new ArrayList<>();
                     DateTimeFormatter formatter = DateTimeFormatter.ISO_INSTANT;
 
@@ -194,6 +196,7 @@ public class CdfFilesBQ {
                             .set("source", element.hasSource() ? element.getSource() : null)
                             .set("asset_ids", assetIds)
                             .set("security_categories", securityCategories)
+                            .set("labels", labels)
                             .set("uploaded", element.getUploaded())
                             .set("uploaded_time", element.hasUploadedTime() ?
                                     formatter.format(Instant.ofEpochMilli(element.getUploadedTime())) : null)
