@@ -35,7 +35,7 @@
 #---------------------------------------------------------------------
 $jobConfigFile = $gcpBucketPrefix + '-test/config/replicate/job-config-assets-replication.toml'
 
-mvn compile exec:java -D exec.mainClass=com.cognite.sa.beam.replicate.ReplicateAssets -D exec.args="--cdfInputSecret=$cdfInputSecret --cdfInputHost=$cdfInputHost --cdfOutputSecret=$cdfOutputSecret --cdfOutputHost=$cdfOutputHost --jobConfigFile=$jobConfigFile --project=$gcpProject --runner=DataFlowRunner --gcpTempLocation=$gcpBucketPrefix-test/temp --stagingLocation=$gcpBucketPrefix-test/stage/replicate/replicate-assets --region=europe-west1 --experiments=shuffle_mode=service --numWorkers=1 --maxNumWorkers=2 --experiments=enable_stackdriver_agent_metrics,enable_execution_details_collection,use_monitoring_state_manager --workerMachineType=e2-standard-2"
+mvn compile exec:java -D exec.mainClass=com.cognite.sa.beam.replicate.ReplicateAssets -D exec.args="--cdfInputSecret=$cdfInputSecret --cdfInputHost=$cdfInputHost --cdfOutputSecret=$cdfOutputSecret --cdfOutputHost=$cdfOutputHost --jobConfigFile=$jobConfigFile --project=$gcpProject --runner=DataFlowRunner --gcpTempLocation=$gcpBucketPrefix-test/temp --stagingLocation=$gcpBucketPrefix-test/stage/replicate/replicate-assets --region=europe-west1 --numWorkers=1 --maxNumWorkers=2 --experiments=enable_stackdriver_agent_metrics,enable_execution_details_collection,use_monitoring_state_manager --workerMachineType=e2-standard-2"
 
 # In order to add profiling:
 # --profilingAgentConfiguration='{\""APICurated\"" : true}'
