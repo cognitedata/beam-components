@@ -36,4 +36,4 @@ $outputMainTable = $outputDataSet + '.cdf_relationship'
 # Full read. Set to _true_ for full read, _false_ for delta read
 #$fullRead = 'true'
 
-mvn compile exec:java -D exec.mainClass=com.cognite.sa.beam.bq.CdfLabelsBQ -D exec.args="--cdfSecret=$cdfSecret --cdfHost=$cdfHost --bqTempStorage=$bqTempStorage --outputMainTable=$outputMainTable --project=$gcpProject --runner=DataFlowRunner --gcpTempLocation=$gcpBucketPrefix-test/temp --stagingLocation=$gcpBucketPrefix-test/stage/cdf-labels-bq --region=europe-west1 --experiments=shuffle_mode=service --maxNumWorkers=2 --experiments=enable_stackdriver_agent_metrics --workerMachineType=e2-standard-2"
+mvn compile exec:java -D exec.mainClass=com.cognite.sa.beam.bq.CdfLabelsBQ -D exec.args="--cdfSecret=$cdfSecret --cdfHost=$cdfHost --bqTempStorage=$bqTempStorage --outputMainTable=$outputMainTable --project=$gcpProject --runner=DataFlowRunner --gcpTempLocation=$gcpBucketPrefix-test/temp --stagingLocation=$gcpBucketPrefix-test/stage/cdf-labels-bq --region=europe-west1 --maxNumWorkers=2 --experiments=enable_stackdriver_agent_metrics --workerMachineType=e2-standard-2"
