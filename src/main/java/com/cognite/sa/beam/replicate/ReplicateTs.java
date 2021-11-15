@@ -542,7 +542,7 @@ public class ReplicateTs {
          - Build the request to read the datapoints for each batch of headers. The time window is specified here.
          - Process all read requests.
          */
-        PCollection<Iterable<TimeseriesPoint>> tsPoints = tsHeaders
+        PCollection<List<TimeseriesPoint>> tsPoints = tsHeaders
                 .apply("Add key", WithKeys.of(ThreadLocalRandom.current().nextInt(20)))
                 .apply("Batch TS items", GroupIntoBatches.<Integer, TimeseriesMetadata>of(
                         KvCoder.of(VarIntCoder.of(), ProtoCoder.of(TimeseriesMetadata.class)))
