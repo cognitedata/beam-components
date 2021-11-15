@@ -324,7 +324,7 @@ public class ReplicateAssets {
 
         Write the prepared events to target.
          */
-        PCollectionTuple assetsPCollectionTuple = p
+        PCollection<Asset> assetsPCollectionTuple = p
                 .apply("Build basic query", Create.of(RequestParameters.create()))
                 .apply("Add dataset filter", ParDo.of(new DoFn<RequestParameters, RequestParameters>() {
                     @ProcessElement

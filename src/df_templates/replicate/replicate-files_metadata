@@ -9,7 +9,7 @@
   },
    {
      "name": "cdfInputHost",
-     "label": "CDF api host",
+     "label": "CDF source api host",
      "help_text": "CDF api host. ex: https://api.cognitedata.com",
      "is_optional": true
    },
@@ -21,7 +21,7 @@
      },
      {
           "name": "cdfOutputHost",
-          "label": "CDF api host",
+          "label": "CDF target api host",
           "help_text": "CDF api host. ex: https://api.cognitedata.com",
           "is_optional": true
         },
