@@ -55,6 +55,7 @@ public class CdfLabelsBQ {
             new TableFieldSchema().setName("external_id").setType("STRING"),
             new TableFieldSchema().setName("name").setType("STRING"),
             new TableFieldSchema().setName("description").setType("STRING"),
+            new TableFieldSchema().setName("data_set_id").setType("INT64"),
             new TableFieldSchema().setName("created_time").setType("TIMESTAMP"),
             new TableFieldSchema().setName("row_updated_time").setType("TIMESTAMP")
     ));
@@ -140,6 +141,7 @@ public class CdfLabelsBQ {
                             .set("external_id", element.getExternalId())
                             .set("name", element.getName())
                             .set("description", element.hasDescription() ? element.getDescription() : null)
+                            .set("data_set_id", element.hasDataSetId() ? element.getDataSetId() : null)
                             .set("created_time", element.hasCreatedTime()
                                     ? formatter.format(Instant.ofEpochMilli(element.getCreatedTime())) : null)
                             .set("row_updated_time", formatter.format(Instant.now()));
