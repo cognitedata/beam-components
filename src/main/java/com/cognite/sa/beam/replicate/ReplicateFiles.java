@@ -51,6 +51,8 @@ public class ReplicateFiles {
     private static final String appIdentifier = "Replicate_Files";
     private static final String contextualizationConfigKey = "enableContextualization";
     private static final String dataSetConfigKey = "enableDataSetMapping";
+    private static final String forwardSlashSubString = "/";
+    private static final String backSlashSubString = "\\";
 
     private static class PrepareFiles extends DoFn<FileContainer, FileContainer> {
         PCollectionView<Map<String, String>> configMap;
@@ -143,7 +145,57 @@ public class ReplicateFiles {
             out.output(fileBuilder.build());
 
         }
+
     }
+
+    public static class CleanFileNames extends DoFn<FileContainer, FileContainer> {
+        final Counter forwardSlashCounter = Metrics.counter(CleanFileNames.class,
+                "Forward slash in name");
+        final Counter backSlashCounter = Metrics.counter(CleanFileNames.class,
+                "Backward slash in name");
+        final Counter cleanedNameCounter = Metrics.counter(CleanFileNames.class,
+                "Cleaned file name");
+
+
+        public CleanFileNames() {
+        }
+
+        @ProcessElement
+        public void processElement(@Element FileContainer input,
+                                   OutputReceiver<FileContainer> out,
+                                   ProcessContext context) {
+
+            FileMetadata fileMetadata = input.getFileMetadata();
+            String originalFileName = fileMetadata.getName();
+            String cleanedFileName = originalFileName;
+
+            FileMetadata.Builder fileMetadataBuilder = fileMetadata.toBuilder();
+
+            if (cleanedFileName.contains(forwardSlashSubString)) {
+                cleanedFileName = cleanedFileName.replace(forwardSlashSubString, "-");
+                forwardSlashCounter.inc();
+            }
+
+            if (cleanedFileName.contains(backSlashSubString)) {
+                cleanedFileName = cleanedFileName.replace(backSlashSubString, "-");
+                backSlashCounter.inc();
+            }
+
+            if (!cleanedFileName.equals(originalFileName)) {
+                fileMetadataBuilder.setName(cleanedFileName);
+                fileMetadataBuilder.putMetadata("originalFileName", originalFileName);
+                LOG.info("Changed file name from '{}' to '{}'", originalFileName, cleanedFileName);
+                cleanedNameCounter.inc();
+            }
+
+            FileContainer.Builder fileBuilder = input.toBuilder()
+                    .setFileMetadata(fileMetadataBuilder.build());
+
+            out.output(fileBuilder.build());
+
+        }
+    }
+
 
     public interface ReplicateFilesOptions extends PipelineOptions {
 
@@ -338,7 +390,6 @@ public class ReplicateFiles {
                         RequestParameters req = input
                                 .withFilterParameter("lastUpdatedTime", ImmutableMap.of(
                                         "max", System.currentTimeMillis()
-
                                 ))
                                 ;
 
@@ -360,6 +411,7 @@ public class ReplicateFiles {
                         .withTempStorageURI(options.getTempStorageUri())
                         .enableForceTempStorage(true)
                 )
+                .apply("Clean file names", ParDo.of(new CleanFileNames()))
                 .apply("Process files", ParDo.of(new PrepareFiles(configMap,
                         sourceAssetsIdMap,
                         targetAssetsExtIdMap,
