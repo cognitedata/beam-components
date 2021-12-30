@@ -155,7 +155,7 @@ public class ReplicateRaw {
 
         // Parse dbName allow and deny lists to side input
         PCollectionView<List<String>> denyListDbName = p
-                .apply("Read dbName allow list", ReadTomlStringArray.from(options.getJobConfigFile())
+                .apply("Read dbName deny list", ReadTomlStringArray.from(options.getJobConfigFile())
                         .withArrayKey("denyList.dbNames"))
                 .apply("Log dbName deny", MapElements.into(TypeDescriptors.strings())
                         .via(expression -> {
