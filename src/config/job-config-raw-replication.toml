@@ -1,3 +1,4 @@
+# Filters specifying which raw databases to include in the replication
 [allowList]
 dbNames = ["*"]     # "*" includes all DBs
 [denyList]
