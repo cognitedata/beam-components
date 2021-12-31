@@ -189,7 +189,7 @@ public class ReplicateRaw {
                 .apply("Break fusion", BreakFusion.<RawTable>create());
 
         // Read all rows
-        PCollection<RawRow> rows = rawTables
+        PCollection<Iterable<RawRow>> rowsBatches = rawTables
                 .apply("Map to read row requests", MapElements
                         .into(TypeDescriptor.of(RequestParameters.class))
                         .via((RawTable input) ->
@@ -198,15 +198,18 @@ public class ReplicateRaw {
                                         .withTableName(input.getTableName())
                                         .withRootParameter("limit", 2000)
                         ))
-                .apply("Read cdf raw rows", CogniteIO.readAllRawRow()
+                .apply("Read cdf raw rows", CogniteIO.readAllDirectRawRow()
                         .withProjectConfig(sourceConfig)
                         .withHints(Hints.create()
                                 .withReadShards(4))
                         .withReaderConfig(ReaderConfig.create()
-                                .withAppIdentifier(appIdentifier)));
+                                .withAppIdentifier(appIdentifier)))
+                .apply(MapElements.into(TypeDescriptors.iterables(TypeDescriptor.of(RawRow.class)))
+                        .via(rowList -> (Iterable<RawRow>) rowList))
+                ;
 
         // Write rows to target CDF
-        rows.apply("Write raw rows to target CDF", CogniteIO.writeRawRow()
+        rowsBatches.apply("Write raw rows to target CDF", CogniteIO.writeDirectRawRow()
                 .withProjectConfig(targetConfig)
                 .withHints(Hints.create()
                         .withWriteShards(10))
