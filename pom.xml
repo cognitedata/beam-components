@@ -14,8 +14,8 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <java.version>11</java.version>
 
-        <beam.version>2.35.0</beam.version>
-        <beam.connector.version>0.9.32</beam.connector.version>
+        <beam.version>2.36.0</beam.version>
+        <beam.connector.version>0.9.35</beam.connector.version>
         <junit.version>5.8.2</junit.version>
         <logback.classic.version>1.2.10</logback.classic.version>
         <maven-jar-plugin.version>3.0.0</maven-jar-plugin.version>
