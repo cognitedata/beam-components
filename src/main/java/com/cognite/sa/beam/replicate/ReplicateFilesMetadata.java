@@ -53,7 +53,7 @@ public class ReplicateFilesMetadata {
     private static final String contextualizationConfigKey = "enableContextualization";
     private static final String dataSetConfigKey = "enableDataSetMapping";
 
-    private static class PrepareFilesMetadata extends DoFn<FileMetadata, FileMetadata> {
+    private static class PrepareFilesMetadata extends DoFn<List<FileMetadata>, Iterable<FileMetadata>> {
         PCollectionView<Map<String, String>> configMap;
         PCollectionView<Map<Long, String>> sourceAssetsIdMapView;
         PCollectionView<Map<String, Long>> targetAssetsExtIdMapView;
@@ -84,8 +84,8 @@ public class ReplicateFilesMetadata {
         }
 
         @ProcessElement
-        public void processElement(@Element FileMetadata input,
-                                   OutputReceiver<FileMetadata> out,
+        public void processElement(@Element List<FileMetadata> input,
+                                   OutputReceiver<Iterable<FileMetadata>> out,
                                    ProcessContext context) {
             Map<String, String> config = context.sideInput(configMap);
             Map<Long, String> sourceAssetsIdMap = context.sideInput(sourceAssetsIdMapView);
@@ -93,54 +93,61 @@ public class ReplicateFilesMetadata {
             Map<Long, String> sourceDataSetsIdMap = context.sideInput(sourceDataSetsIdMapView);
             Map<String, Long> targetDataSetsExtIdMap = context.sideInput(targetDataSetsExtIdMapView);
 
-            FileMetadata.Builder fileMetadataBuilder = input.toBuilder()
-                    .clearId()
-                    .clearAssetIds()
-                    .clearCreatedTime()
-                    .clearLastUpdatedTime()
-                    .clearDataSetId();
+            List<FileMetadata> outputList = new ArrayList<>();
 
-            if (!input.hasExternalId()) {
-                fileMetadataBuilder.setExternalId(String.valueOf(fileMetadataBuilder.getId()));
-                missingExtIdCounter.inc();
-            }
+            // Process each individual item in the input collection.
+            for (FileMetadata inputElement : input) {
+                FileMetadata.Builder fileMetadataBuilder = inputElement.toBuilder()
+                        .clearId()
+                        .clearAssetIds()
+                        .clearCreatedTime()
+                        .clearLastUpdatedTime()
+                        .clearDataSetId();
 
-            // Add asset link if enabled and it is available on the target
-            if (config.getOrDefault(contextualizationConfigKey, "no").equalsIgnoreCase("yes")
-                    && input.getAssetIdsCount() > 0) {
-                for (Long assetId : input.getAssetIdsList()) {
-                    // If the source asset has an externalId, use it -- if not, use the asset internal id
-                    String targetAssetExtId = sourceAssetsIdMap.getOrDefault(assetId, String.valueOf(assetId));
+                if (!inputElement.hasExternalId()) {
+                    fileMetadataBuilder.setExternalId(String.valueOf(fileMetadataBuilder.getId()));
+                    missingExtIdCounter.inc();
+                }
 
-                    if (targetAssetsExtIdMap.containsKey(targetAssetExtId)) {
-                        fileMetadataBuilder.addAssetIds(targetAssetsExtIdMap.get(targetAssetExtId));
-                        assetMapCounter.inc();
-                    } else {
-                        noAssetMapCounter.inc();
-                        LOG.warn("Could not map asset linke for source asset externalId = [{}]",
-                                targetAssetExtId);
+                // Add asset link if enabled and it is available on the target
+                if (config.getOrDefault(contextualizationConfigKey, "no").equalsIgnoreCase("yes")
+                        && inputElement.getAssetIdsCount() > 0) {
+                    for (Long assetId : inputElement.getAssetIdsList()) {
+                        // If the source asset has an externalId, use it -- if not, use the asset internal id
+                        String targetAssetExtId = sourceAssetsIdMap.getOrDefault(assetId, String.valueOf(assetId));
+
+                        if (targetAssetsExtIdMap.containsKey(targetAssetExtId)) {
+                            fileMetadataBuilder.addAssetIds(targetAssetsExtIdMap.get(targetAssetExtId));
+                            assetMapCounter.inc();
+                        } else {
+                            noAssetMapCounter.inc();
+                            LOG.warn("Could not map asset linke for source asset externalId = [{}]",
+                                    targetAssetExtId);
+                        }
                     }
                 }
-            }
 
-            // Map data set if enabled and it is available on the target
-            if(config.getOrDefault(dataSetConfigKey, "no").equalsIgnoreCase("yes")
-                    && input.hasDataSetId()) {
-                String targetDataSetExtId = sourceDataSetsIdMap.getOrDefault(
-                        input.getDataSetId(),
-                        String.valueOf(input.getDataSetId()));
+                // Map data set if enabled and it is available on the target
+                if(config.getOrDefault(dataSetConfigKey, "no").equalsIgnoreCase("yes")
+                        && inputElement.hasDataSetId()) {
+                    String targetDataSetExtId = sourceDataSetsIdMap.getOrDefault(
+                            inputElement.getDataSetId(),
+                            String.valueOf(inputElement.getDataSetId()));
 
-                if (targetDataSetsExtIdMap.containsKey(targetDataSetExtId)) {
-                    fileMetadataBuilder.setDataSetId(targetDataSetsExtIdMap.get(targetDataSetExtId));
-                    dataSetMapCounter.inc();
-                } else {
-                    noDataSetMapCounter.inc();
-                    LOG.warn("Could not map data set for source file id = [{}]",
-                            input.getId());
+                    if (targetDataSetsExtIdMap.containsKey(targetDataSetExtId)) {
+                        fileMetadataBuilder.setDataSetId(targetDataSetsExtIdMap.get(targetDataSetExtId));
+                        dataSetMapCounter.inc();
+                    } else {
+                        noDataSetMapCounter.inc();
+                        LOG.warn("Could not map data set for source file id = [{}]",
+                                inputElement.getId());
+                    }
                 }
+
+                outputList.add(fileMetadataBuilder.build());
             }
 
-            out.output(fileMetadataBuilder.build());
+            out.output(outputList);
         }
     }
 
@@ -347,13 +354,13 @@ public class ReplicateFilesMetadata {
                         }
                     }
                 }).withSideInputs(allowListDataSet))
-                .apply("Read source files metadata", CogniteIO.readAllFilesMetadata()
+                .apply("Read source files metadata", CogniteIO.readAllDirectFilesMetadata()
                         .withProjectConfig(sourceConfig)
                         .withHints(Hints.create())
                         .withReaderConfig(ReaderConfig.create()
                                 .withAppIdentifier(appIdentifier)
                                 .withDeltaIdentifier(options.getDeltaIdentifier())
-                                .withDeltaOffset(Duration.ofMinutes(30))
+                                .withDeltaOffset(Duration.ofMinutes(60))
                                 .withFullReadOverride(options.getFullRead())))
                 .apply("Process files metadata", ParDo.of(new PrepareFilesMetadata(configMap,
                         sourceAssetsIdMap,
@@ -366,7 +373,7 @@ public class ReplicateFilesMetadata {
                                 targetAssetsExtIdMap,
                                 sourceDataSetsIdMap,
                                 targetDataSetsExtIdMap))
-                .apply("Write target files metadata", CogniteIO.writeFilesMetadata()
+                .apply("Write target files metadata", CogniteIO.writeDirectFilesMetadata()
                         .withProjectConfig(targetConfig)
                         .withWriterConfig(WriterConfig.create()
                                 .withAppIdentifier(appIdentifier)
