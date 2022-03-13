@@ -54,7 +54,7 @@ public class ReplicateFiles {
     private static final String forwardSlashSubString = "/";
     private static final String backSlashSubString = "\\";
 
-    private static class PrepareFiles extends DoFn<FileContainer, FileContainer> {
+    private static class PrepareFiles extends DoFn<List<FileContainer>, Iterable<FileContainer>> {
         PCollectionView<Map<String, String>> configMap;
         PCollectionView<Map<Long, String>> sourceAssetsIdMapView;
         PCollectionView<Map<String, Long>> targetAssetsExtIdMapView;
@@ -83,8 +83,8 @@ public class ReplicateFiles {
         }
 
         @ProcessElement
-        public void processElement(@Element FileContainer input,
-                                   OutputReceiver<FileContainer> out,
+        public void processElement(@Element List<FileContainer> input,
+                                   OutputReceiver<Iterable<FileContainer>> out,
                                    ProcessContext context) {
             Map<String, String> config = context.sideInput(configMap);
             Map<Long, String> sourceAssetsIdMap = context.sideInput(sourceAssetsIdMapView);
@@ -92,63 +92,68 @@ public class ReplicateFiles {
             Map<Long, String> sourceDataSetsIdMap = context.sideInput(sourceDataSetsIdMapView);
             Map<String, Long> targetDataSetsExtIdMap = context.sideInput(targetDataSetsExtIdMapView);
 
-            FileMetadata fileMetadata = input.getFileMetadata();
+            List<FileContainer> outputList = new ArrayList<>();
+            for (FileContainer fileContainer : input) {
+                FileMetadata fileMetadata = fileContainer.getFileMetadata();
+                FileMetadata.Builder fileMetadataBuilder = fileMetadata.toBuilder()
+                        .clearId()
+                        .clearAssetIds()
+                        .clearCreatedTime()
+                        .clearLastUpdatedTime()
+                        .clearDataSetId();
 
-            FileMetadata.Builder fileMetadataBuilder = fileMetadata.toBuilder()
-                    .clearId()
-                    .clearAssetIds()
-                    .clearCreatedTime()
-                    .clearLastUpdatedTime()
-                    .clearDataSetId();
+                if (!fileMetadata.hasExternalId()) {
+                    fileMetadataBuilder.setExternalId(String.valueOf(fileMetadata.getId()));
+                    missingExtIdCounter.inc();
+                }
 
-            if (!fileMetadata.hasExternalId()) {
-                fileMetadataBuilder.setExternalId(String.valueOf(fileMetadata.getId()));
-                missingExtIdCounter.inc();
-            }
+                // Add asset link if enabled and it is available on the target
+                if (config.getOrDefault(contextualizationConfigKey, "no").equalsIgnoreCase("yes")
+                        && fileMetadata.getAssetIdsCount() > 0) {
+                    for (Long assetId : fileMetadata.getAssetIdsList()) {
+                        // If the source asset has an externalId, use it -- if not, use the asset internal id
+                        String targetAssetExtId = sourceAssetsIdMap.getOrDefault(assetId, String.valueOf(assetId));
 
-            // Add asset link if enabled and it is available on the target
-            if (config.getOrDefault(contextualizationConfigKey, "no").equalsIgnoreCase("yes")
-                    && fileMetadata.getAssetIdsCount() > 0) {
-                for (Long assetId : fileMetadata.getAssetIdsList()) {
-                    // If the source asset has an externalId, use it -- if not, use the asset internal id
-                    String targetAssetExtId = sourceAssetsIdMap.getOrDefault(assetId, String.valueOf(assetId));
-
-                    if (targetAssetsExtIdMap.containsKey(targetAssetExtId)) {
-                        fileMetadataBuilder.addAssetIds(targetAssetsExtIdMap.get(targetAssetExtId));
-                        assetMapCounter.inc();
-                    } else {
-                        noAssetMapCounter.inc();
-                        LOG.warn("Could not map asset linke for source asset externalId = [{}]",
-                                targetAssetExtId);
+                        if (targetAssetsExtIdMap.containsKey(targetAssetExtId)) {
+                            fileMetadataBuilder.addAssetIds(targetAssetsExtIdMap.get(targetAssetExtId));
+                            assetMapCounter.inc();
+                        } else {
+                            noAssetMapCounter.inc();
+                            LOG.warn("Could not map asset linke for source asset externalId = [{}]",
+                                    targetAssetExtId);
+                        }
                     }
                 }
-            }
 
-            // Map data set if enabled and it is available on the target
-            if(config.getOrDefault(dataSetConfigKey, "no").equalsIgnoreCase("yes")
-                    && fileMetadata.hasDataSetId()) {
-                String targetDataSetExtId = sourceDataSetsIdMap.getOrDefault(
-                        fileMetadata.getDataSetId(),
-                        String.valueOf(fileMetadata.getDataSetId()));
+                // Map data set if enabled, and it is available on the target
+                if(config.getOrDefault(dataSetConfigKey, "no").equalsIgnoreCase("yes")
+                        && fileMetadata.hasDataSetId()) {
+                    String targetDataSetExtId = sourceDataSetsIdMap.getOrDefault(
+                            fileMetadata.getDataSetId(),
+                            String.valueOf(fileMetadata.getDataSetId()));
 
-                if (targetDataSetsExtIdMap.containsKey(targetDataSetExtId)) {
-                    fileMetadataBuilder.setDataSetId(targetDataSetsExtIdMap.get(targetDataSetExtId));
-                    dataSetMapCounter.inc();
+                    if (targetDataSetsExtIdMap.containsKey(targetDataSetExtId)) {
+                        fileMetadataBuilder.setDataSetId(targetDataSetsExtIdMap.get(targetDataSetExtId));
+                        dataSetMapCounter.inc();
+                    }
                 }
+
+                outputList.add(
+                        fileContainer.toBuilder()
+                                .setFileMetadata(fileMetadataBuilder)
+                                .build()
+                );
             }
 
-            // Check for constraint violations and correct the data
-
-            FileContainer.Builder fileBuilder = input.toBuilder()
-                    .setFileMetadata(fileMetadataBuilder.build());
-
-            out.output(fileBuilder.build());
-
+            out.output(outputList);
         }
 
     }
 
-    public static class CleanFileNames extends DoFn<FileContainer, FileContainer> {
+    /**
+     * Replaces forward and backslash characters ("/" and "\") with dash ("-").
+     */
+    private static class CleanFileNames extends DoFn<List<FileContainer>, List<FileContainer>> {
         final Counter forwardSlashCounter = Metrics.counter(CleanFileNames.class,
                 "Forward slash in name");
         final Counter backSlashCounter = Metrics.counter(CleanFileNames.class,
@@ -156,46 +161,42 @@ public class ReplicateFiles {
         final Counter cleanedNameCounter = Metrics.counter(CleanFileNames.class,
                 "Cleaned file name");
 
-
-        public CleanFileNames() {
-        }
-
         @ProcessElement
-        public void processElement(@Element FileContainer input,
-                                   OutputReceiver<FileContainer> out,
-                                   ProcessContext context) {
+        public void processElement(@Element List<FileContainer> input,
+                                   OutputReceiver<List<FileContainer>> out) {
+            List<FileContainer> outputList = new ArrayList<>();
+            for (FileContainer fileContainer : input) {
+                FileMetadata fileMetadata = fileContainer.getFileMetadata();
+                String originalFileName = fileMetadata.getName();
+                String cleanedFileName = originalFileName;
 
-            FileMetadata fileMetadata = input.getFileMetadata();
-            String originalFileName = fileMetadata.getName();
-            String cleanedFileName = originalFileName;
+                FileMetadata.Builder fileMetadataBuilder = fileMetadata.toBuilder();
 
-            FileMetadata.Builder fileMetadataBuilder = fileMetadata.toBuilder();
+                if (cleanedFileName.contains(forwardSlashSubString)) {
+                    cleanedFileName = cleanedFileName.replace(forwardSlashSubString, "-");
+                    forwardSlashCounter.inc();
+                }
 
-            if (cleanedFileName.contains(forwardSlashSubString)) {
-                cleanedFileName = cleanedFileName.replace(forwardSlashSubString, "-");
-                forwardSlashCounter.inc();
+                if (cleanedFileName.contains(backSlashSubString)) {
+                    cleanedFileName = cleanedFileName.replace(backSlashSubString, "-");
+                    backSlashCounter.inc();
+                }
+
+                if (!cleanedFileName.equals(originalFileName)) {
+                    fileMetadataBuilder.setName(cleanedFileName);
+                    fileMetadataBuilder.putMetadata("originalFileName", originalFileName);
+                    LOG.info("Changed file name from '{}' to '{}'", originalFileName, cleanedFileName);
+                    cleanedNameCounter.inc();
+                }
+
+                outputList.add(fileContainer.toBuilder()
+                        .setFileMetadata(fileMetadataBuilder)
+                        .build());
             }
 
-            if (cleanedFileName.contains(backSlashSubString)) {
-                cleanedFileName = cleanedFileName.replace(backSlashSubString, "-");
-                backSlashCounter.inc();
-            }
-
-            if (!cleanedFileName.equals(originalFileName)) {
-                fileMetadataBuilder.setName(cleanedFileName);
-                fileMetadataBuilder.putMetadata("originalFileName", originalFileName);
-                LOG.info("Changed file name from '{}' to '{}'", originalFileName, cleanedFileName);
-                cleanedNameCounter.inc();
-            }
-
-            FileContainer.Builder fileBuilder = input.toBuilder()
-                    .setFileMetadata(fileMetadataBuilder.build());
-
-            out.output(fileBuilder.build());
-
+            out.output(outputList);
         }
     }
-
 
     public interface ReplicateFilesOptions extends PipelineOptions {
 
@@ -302,8 +303,7 @@ public class ReplicateFiles {
                 .apply("Read source assets", CogniteIO.readAssets()
                         .withProjectConfig(sourceConfig)
                         .withReaderConfig(ReaderConfig.create()
-                                .withAppIdentifier(appIdentifier)
-                                .enableMetrics(false)))
+                                .withAppIdentifier(appIdentifier)))
                 .apply("Extract id + externalId", MapElements
                         .into(TypeDescriptors.kvs(TypeDescriptors.longs(), TypeDescriptors.strings()))
                         .via((Asset asset) -> KV.of(asset.getId(), asset.getExternalId())))
@@ -314,8 +314,7 @@ public class ReplicateFiles {
                 .apply("Read target assets", CogniteIO.readAssets()
                         .withProjectConfig(targetConfig)
                         .withReaderConfig(ReaderConfig.create()
-                                .withAppIdentifier(appIdentifier)
-                                .enableMetrics(false)))
+                                .withAppIdentifier(appIdentifier)))
                 .apply("Extract externalId + id", MapElements
                         .into(TypeDescriptors.kvs(TypeDescriptors.strings(), TypeDescriptors.longs()))
                         .via((Asset asset) -> KV.of(asset.getExternalId(), asset.getId())))
@@ -331,8 +330,7 @@ public class ReplicateFiles {
                 .apply("Read source data sets", CogniteIO.readDataSets()
                         .withProjectConfig(sourceConfig)
                         .withReaderConfig(ReaderConfig.create()
-                                .withAppIdentifier(appIdentifier)
-                                .enableMetrics(false)))
+                                .withAppIdentifier(appIdentifier)))
                 .apply("Select id + externalId", MapElements
                         .into(TypeDescriptors.kvs(TypeDescriptors.longs(), TypeDescriptors.strings()))
                         .via((DataSet dataSet) -> {
@@ -349,7 +347,7 @@ public class ReplicateFiles {
                 .apply("Read target data sets", CogniteIO.readDataSets()
                         .withProjectConfig(targetConfig)
                         .withReaderConfig(ReaderConfig.create()
-                                .withAppIdentifier(appIdentifier).enableMetrics(false)))
+                                .withAppIdentifier(appIdentifier)))
                 .apply("Select external id + id", MapElements
                         .into(TypeDescriptors.kvs(TypeDescriptors.strings(), TypeDescriptors.longs()))
                         .via((DataSet dataSet) -> {
@@ -402,10 +400,8 @@ public class ReplicateFiles {
                         }
                     }
                 }).withSideInputs(allowListDataSet))
-                .apply("Read source files", CogniteIO.readAllFiles()
+                .apply("Read source files", CogniteIO.readAllDirectFiles()
                         .withProjectConfig(sourceConfig)
-                        .withHints(Hints.create()
-                                .withReadFileBinaryBatchSize(8))
                         .withReaderConfig(ReaderConfig.create()
                                 .withAppIdentifier(appIdentifier))
                         .withTempStorageURI(options.getTempStorageUri())
@@ -423,11 +419,8 @@ public class ReplicateFiles {
                                 targetAssetsExtIdMap,
                                 sourceDataSetsIdMap,
                                 targetDataSetsExtIdMap))
-                .apply("Write target files", CogniteIO.writeFiles()
+                .apply("Write target files", CogniteIO.writeDirectFiles()
                         .withProjectConfig(targetConfig)
-                        .withHints(Hints.create()
-                                .withWriteShards(4)
-                                .withWriteFileBatchSize(8))
                         .withWriterConfig(WriterConfig.create()
                                 .withAppIdentifier(appIdentifier)
                                 .withUpsertMode(UpsertMode.REPLACE)));

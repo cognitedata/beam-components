@@ -189,7 +189,7 @@ public class ReplicateRaw {
                 .apply("Break fusion", BreakFusion.<RawTable>create());
 
         // Read all rows
-        PCollection<Iterable<RawRow>> rowsBatches = rawTables
+        PCollection<List<RawRow>> rowsBatches = rawTables
                 .apply("Map to read row requests", MapElements
                         .into(TypeDescriptor.of(RequestParameters.class))
                         .via((RawTable input) ->
@@ -204,8 +204,6 @@ public class ReplicateRaw {
                                 .withReadShards(4))
                         .withReaderConfig(ReaderConfig.create()
                                 .withAppIdentifier(appIdentifier)))
-                .apply(MapElements.into(TypeDescriptors.iterables(TypeDescriptor.of(RawRow.class)))
-                        .via(rowList -> (Iterable<RawRow>) rowList))
                 ;
 
         // Write rows to target CDF
