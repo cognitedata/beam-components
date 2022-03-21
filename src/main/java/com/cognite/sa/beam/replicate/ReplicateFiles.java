@@ -18,10 +18,7 @@ package com.cognite.sa.beam.replicate;
 
 import com.cognite.beam.io.CogniteIO;
 import com.cognite.beam.io.config.*;
-import com.cognite.client.dto.Asset;
-import com.cognite.client.dto.DataSet;
-import com.cognite.client.dto.FileContainer;
-import com.cognite.client.dto.FileMetadata;
+import com.cognite.client.dto.*;
 import com.cognite.beam.io.RequestParameters;
 import com.cognite.beam.io.transform.toml.ReadTomlStringArray;
 import com.cognite.beam.io.transform.toml.ReadTomlStringMap;
@@ -44,6 +41,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 public class ReplicateFiles {
     // The log to output status messages to.
@@ -51,6 +49,7 @@ public class ReplicateFiles {
     private static final String appIdentifier = "Replicate_Files";
     private static final String contextualizationConfigKey = "enableContextualization";
     private static final String dataSetConfigKey = "enableDataSetMapping";
+    private static final String labelsConfigKey = "ignoreInvalidLabels";
     private static final String forwardSlashSubString = "/";
     private static final String backSlashSubString = "\\";
 
@@ -60,6 +59,7 @@ public class ReplicateFiles {
         PCollectionView<Map<String, Long>> targetAssetsExtIdMapView;
         PCollectionView<Map<Long, String>> sourceDataSetsIdMapView;
         PCollectionView<Map<String, Long>> targetDataSetsExtIdMapView;
+        PCollectionView<List<String>> targetLabelExtIdListView;
 
         final Counter missingExtIdCounter = Metrics.counter(PrepareFiles.class,
                 "No external id");
@@ -69,17 +69,21 @@ public class ReplicateFiles {
                 "Asset ids not mapped");
         final Counter dataSetMapCounter = Metrics.counter(PrepareFiles.class,
                 "Data set mapped");
+        final Counter invalidLabelCounter = Metrics.counter(PrepareFiles.class,
+                "Removed labels");
 
         public PrepareFiles(PCollectionView<Map<String, String>> configMap,
                             PCollectionView<Map<Long, String>> sourceAssetsIdMapView,
                             PCollectionView<Map<String, Long>> targetAssetsExtIdMapView,
                             PCollectionView<Map<Long, String>> sourceDataSetsIdMapView,
-                            PCollectionView<Map<String, Long>> targetDataSetsExtIdMapView) {
+                            PCollectionView<Map<String, Long>> targetDataSetsExtIdMapView,
+                            PCollectionView<List<String>> targetLabelExtIdListView) {
             this.configMap = configMap;
             this.sourceAssetsIdMapView = sourceAssetsIdMapView;
             this.targetAssetsExtIdMapView = targetAssetsExtIdMapView;
             this.sourceDataSetsIdMapView = sourceDataSetsIdMapView;
             this.targetDataSetsExtIdMapView = targetDataSetsExtIdMapView;
+            this.targetLabelExtIdListView = targetLabelExtIdListView;
         }
 
         @ProcessElement
@@ -91,6 +95,7 @@ public class ReplicateFiles {
             Map<String, Long> targetAssetsExtIdMap = context.sideInput(targetAssetsExtIdMapView);
             Map<Long, String> sourceDataSetsIdMap = context.sideInput(sourceDataSetsIdMapView);
             Map<String, Long> targetDataSetsExtIdMap = context.sideInput(targetDataSetsExtIdMapView);
+            List<String> targetLabelsExtIdList = context.sideInput(targetLabelExtIdListView);
 
             List<FileContainer> outputList = new ArrayList<>();
             for (FileContainer fileContainer : input) {
@@ -107,7 +112,7 @@ public class ReplicateFiles {
                     missingExtIdCounter.inc();
                 }
 
-                // Add asset link if enabled and it is available on the target
+                // Add asset link if enabled and if it is available on the target
                 if (config.getOrDefault(contextualizationConfigKey, "no").equalsIgnoreCase("yes")
                         && fileMetadata.getAssetIdsCount() > 0) {
                     for (Long assetId : fileMetadata.getAssetIdsList()) {
@@ -125,7 +130,7 @@ public class ReplicateFiles {
                     }
                 }
 
-                // Map data set if enabled, and it is available on the target
+                // Map data set if enabled, and if it is available on the target
                 if(config.getOrDefault(dataSetConfigKey, "no").equalsIgnoreCase("yes")
                         && fileMetadata.hasDataSetId()) {
                     String targetDataSetExtId = sourceDataSetsIdMap.getOrDefault(
@@ -138,6 +143,29 @@ public class ReplicateFiles {
                     }
                 }
 
+                // Remove invalid labels if enabled
+                if (config.getOrDefault(labelsConfigKey, "no").equalsIgnoreCase("yes")
+                        && fileMetadataBuilder.getLabelsCount() > 0) {
+                    List<String> validLabels = fileMetadataBuilder.getLabelsList().stream()
+                            .filter(label -> targetLabelsExtIdList.contains(label))
+                            .collect(Collectors.toList());
+                    List<String> invalidLabels = fileMetadataBuilder.getLabelsList().stream()
+                            .filter(label -> !targetLabelsExtIdList.contains(label))
+                            .collect(Collectors.toList());
+
+                    fileMetadataBuilder
+                            .clearLabels()
+                            .addAllLabels(validLabels);
+
+                    // log invalid labels...
+                    for (String label : invalidLabels) {
+                        LOG.warn("Found invalid label extId reference {} in file extId {}",
+                                label,
+                                fileMetadataBuilder.getExternalId());
+                        invalidLabelCounter.inc();
+                    }
+                }
+
                 outputList.add(
                         fileContainer.toBuilder()
                                 .setFileMetadata(fileMetadataBuilder)
@@ -147,7 +175,6 @@ public class ReplicateFiles {
 
             out.output(outputList);
         }
-
     }
 
     /**
@@ -281,7 +308,6 @@ public class ReplicateFiles {
                 )
                 .apply("To map view", View.asMap());
 
-
         PCollectionView<List<String>> allowListDataSet = p
                 .apply("Read config allow list", ReadTomlStringArray.from(options.getJobConfigFile())
                         .withArrayKey("allowList.dataSetExternalId"))
@@ -292,7 +318,6 @@ public class ReplicateFiles {
                             return expression;
                         }))
                 .apply("To list view", View.asList());
-
 
         /*
         Read the asset hierarchies from source and target. Shave off the metadata and use id + externalId
@@ -361,6 +386,19 @@ public class ReplicateFiles {
                 .apply("To map view", View.asMap());
 
         /*
+        Read labels from the destination CDF. Will use this list to determine which labels to remove from the files
+        if "ignoreUnknownLabels = yes"
+         */
+        PCollectionView<List<String>> targetLabelExtIdList = p
+                .apply("Read target labels", CogniteIO.readLabels()
+                        .withProjectConfig(targetConfig)
+                        .withReaderConfig(ReaderConfig.create()
+                                .withAppIdentifier(appIdentifier)))
+                .apply("Select extId", MapElements.into(TypeDescriptors.strings())
+                        .via(Label::getExternalId))
+                .apply("To list view", View.asList());
+
+        /*
         Read files from source and parse them:
         - Filter on data set external id
         - Remove system fields (id, created date, last updated date
@@ -412,13 +450,15 @@ public class ReplicateFiles {
                         sourceAssetsIdMap,
                         targetAssetsExtIdMap,
                         sourceDataSetsIdMap,
-                        targetDataSetsExtIdMap
+                        targetDataSetsExtIdMap,
+                        targetLabelExtIdList
                 ))
                         .withSideInputs(configMap,
                                 sourceAssetsIdMap,
                                 targetAssetsExtIdMap,
                                 sourceDataSetsIdMap,
-                                targetDataSetsExtIdMap))
+                                targetDataSetsExtIdMap,
+                                targetLabelExtIdList))
                 .apply("Write target files", CogniteIO.writeDirectFiles()
                         .withProjectConfig(targetConfig)
                         .withWriterConfig(WriterConfig.create()
