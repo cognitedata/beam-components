@@ -2,6 +2,7 @@
 [config]
 enableContextualization = "yes" # yes/no, try linking the events to assets
 enableDataSetMapping = "yes"    # yes/no, try mapping the source data set to target data set
+ignoreInvalidLabels = "no"      # yes/no, if "yes" will remove file labels that don't exist in the destination
 
 # Filters specifying which events to include in the replication
 [allowList]
