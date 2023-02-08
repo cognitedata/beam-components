@@ -17,7 +17,7 @@
         <beam.version>2.40.0</beam.version>
         <beam.connector.version>0.9.42</beam.connector.version>
         <junit.version>5.8.2</junit.version>
-        <logback.classic.version>1.2.11</logback.classic.version>
+        <logback.classic.version>1.4.5</logback.classic.version>
         <maven-jar-plugin.version>3.0.0</maven-jar-plugin.version>
     </properties>
 
